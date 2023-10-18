@@ -21,7 +21,7 @@ if loihi2_is_available:
     print(f'Running on {Loihi2.partition}')
     compression = io.encoder.Compression.DELTA_SPARSE_8
 else:
-print("Loihi2 compiler is not available in this system. "
+    print("Loihi2 compiler is not available in this system. "
         "This tutorial will execute on CPU backend.")
 compression = io.encoder.Compression.DENSE
 
