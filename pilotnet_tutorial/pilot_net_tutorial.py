@@ -21,9 +21,9 @@ if loihi2_is_available:
     print(f'Running on {Loihi2.partition}')
     compression = io.encoder.Compression.DELTA_SPARSE_8
 else:
-    print("Loihi2 compiler is not available in this system. "
-          "This tutorial will execute on CPU backend.")
-    compression = io.encoder.Compression.DENSE
+print("Loihi2 compiler is not available in this system. "
+        "This tutorial will execute on CPU backend.")
+compression = io.encoder.Compression.DENSE
 
 # create network block
 net = netx.hdf5.Network(net_config='network.net', skip_layers=1)
@@ -100,11 +100,20 @@ dataloader.ground_truth.connect(monitor.gt_in)
 output_decoder.out.connect(monitor.output_in)
 
 # Run the network
+loihi2_is_available = False # force simulation
 if loihi2_is_available:
     run_config = CustomHwRunConfig()
 else:
     run_config = CustomSimRunConfig()
+
 net.run(condition=RunSteps(num_steps=num_steps), run_cfg=run_config)
 output = output_logger.data.get().flatten()
 gts = gt_logger.data.get().flatten()
 net.stop()
+
+plt.figure(figsize=(7, 5))
+plt.plot(np.array(gts), label='Ground Truth')
+plt.plot(np.array(output[out_offset:]).flatten(), label='Lava output')
+plt.xlabel(f'Sample frames (+10550)')
+plt.ylabel('Steering angle (radians)')
+plt.legend()
