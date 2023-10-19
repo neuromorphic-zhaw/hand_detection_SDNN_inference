@@ -2,7 +2,12 @@
 https://github.com/lava-nc/lava-dl/blob/main/tutorials/lava/lib/dl/netx/pilotnet_snn/run.ipynb
 
 ### Requirements
-- `lava_loihi-0.5.0`
+- lava-dl                   0.4.0
+- lava-dnf                  0.1.4
+- lava-loihi                0.5.0
+- lava-nc                   0.8.0
+- lava-optimization         0.3.0
+- nxcore                    2.4.0
 - on `ncl-edu.research.intel-research.net`
 
 ### Problem
