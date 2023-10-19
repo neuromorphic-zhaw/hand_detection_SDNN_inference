@@ -1,5 +1,7 @@
+### Pilotnet SDNN inference tutorial 
+https://github.com/lava-nc/lava-dl/blob/main/tutorials/lava/lib/dl/netx/pilotnet_snn/run.ipynb
+
 ### Requirements
-Tried with 
 - `lava_loihi-0.5.0`
 - on `ncl-edu.research.intel-research.net`
 
