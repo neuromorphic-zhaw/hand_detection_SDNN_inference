@@ -17,7 +17,8 @@ from utils import (
 # Check if Loihi2 compiler is available and import related modules.
 from lava.utils.system import Loihi2
 Loihi2.preferred_partition = 'oheogulch'
-loihi2_is_available = Loihi2.is_loihi2_available
+# loihi2_is_available = Loihi2.is_loihi2_available
+loihi2_is_available = False # force to run on CPU backend
 
 if loihi2_is_available:
     print(f'Running on {Loihi2.partition}')
