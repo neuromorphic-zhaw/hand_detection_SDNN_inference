@@ -89,19 +89,20 @@ dataloader.ground_truth.connect(monitor.gt_in)
 output_decoder.out.connect(monitor.output_in)
 
 # Run the network
-if loihi2_is_available:
-    run_config = CustomHwRunConfig()
-else:
-    run_config = CustomSimRunConfig()
-net.run(condition=RunSteps(num_steps=num_steps), run_cfg=run_config)
-output = output_logger.data.get().flatten()
-gts = gt_logger.data.get().flatten()
-net.stop()
+if __name__ == '__main__':
+    if loihi2_is_available:
+        run_config = CustomHwRunConfig()
+    else:
+        run_config = CustomSimRunConfig()
+    net.run(condition=RunSteps(num_steps=num_steps), run_cfg=run_config)
+    output = output_logger.data.get().flatten()
+    gts = gt_logger.data.get().flatten()
+    net.stop()
 
-# Plot the results
-plt.figure(figsize=(7, 5))
-plt.plot(np.array(gts), label='Ground Truth')
-plt.plot(np.array(output[out_offset:]).flatten(), label='Lava output')
-plt.xlabel(f'Sample frames (+10550)')
-plt.ylabel('Steering angle (radians)')
-plt.legend()
+    # Plot the results
+    plt.figure(figsize=(7, 5))
+    plt.plot(np.array(gts), label='Ground Truth')
+    plt.plot(np.array(output[out_offset:]).flatten(), label='Lava output')
+    plt.xlabel(f'Sample frames (+10550)')
+    plt.ylabel('Steering angle (radians)')
+    plt.legend()
