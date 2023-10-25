@@ -10,7 +10,11 @@ pip list | grep lava
 - lava-loihi                0.5.0
 - lava-nc                   0.8.0
 - lava-optimization         0.3.0
+```bash
+pip list | grep nx
+```
 - nxcore                    2.4.0
+
 - on `ncl-edu.research.intel-research.net`
 
 ### Problem
