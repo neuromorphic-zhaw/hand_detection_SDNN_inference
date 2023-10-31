@@ -4,13 +4,13 @@ from dataset import DHP19NetDataset
 from torch.utils.data import DataLoader
 from lava.proc import io
 from plot import plot_input_sample
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from lava.magma.core.run_conditions import RunSteps
+import numpy as np
+import matplotlib.pyplot as plt
+from lava.magma.core.run_conditions import RunSteps
 
 from utils import (
-    DHP19NetEncoder, DHP19NetDecoder, DHP19NetMonitor)
-#     CustomHwRunConfig, CustomSimRunConfig,
+    DHP19NetEncoder, DHP19NetDecoder, DHP19NetMonitor, CustomHwRunConfig, CustomSimRunConfig
+)
 #     get_input_transform
 # )
 
@@ -18,6 +18,9 @@ from utils import (
 from lava.utils.system import Loihi2
 Loihi2.preferred_partition = 'oheogulch'
 loihi2_is_available = Loihi2.is_loihi2_available
+
+loihi2_is_available = False # Force CPU execution
+
 
 if loihi2_is_available:
     print(f'Running on {Loihi2.partition}')
@@ -27,10 +30,10 @@ else:
           "This tutorial will execute on CPU backend.")
     compression = io.encoder.Compression.DENSE
 
+# Set paths to model and data
 project_path = './'
 model_path = project_path + 'model/train/'
 event_data_path = project_path + '../data/dhp19/'
-
 
 # Create a network block from the trained model.
 
@@ -75,18 +78,18 @@ out_offset = len(net.layers) + 3
 complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
 print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 input, target = complete_dataset[0]
+input.shape # (344, 260, 1) W x H x C x T
+target.shape # (2, 2)
+
 # show sample from the dataset
 for i in range(len(joint_idxs)):
-    plot_input_sample(input, target_coords=target[i,:], title='Input frame, Traget joint ' + str(joint_idxs[i]), path=None)
+    plot_input_sample(np.swapaxes(input[:,:,0,0],0,1), target_coords=target[i,:], title='Input frame, Traget joint ' + str(joint_idxs[i]), path=None)
 
-input.max()
 
-# data_loader = DataLoader(dataset=complete_dataset,
-#                         persistent_workers=True,
-#                         batch_size=8,
-#                         shuffle=False,
-#                         num_workers=12,
-#                         pin_memory=True)
+# Create Dataloader
+# The dataloader process reads data from the dataset objects and sends out the input frame and ground truth as spikes.
+dataloader = io.dataloader.SpikeDataloader(dataset=complete_dataset)
+
 
 # Create Input Encoder
 # The input encoder process does frame difference of subsequent frames to sparsify the input to the network.
@@ -100,15 +103,75 @@ input_encoder = DHP19NetEncoder(shape=net.inp.shape,
 # For Loihi execution, it additionally communicates the network's output spikes from the Loihi 2 chip.
 output_decoder = DHP19NetDecoder(shape=net.out.shape)
 
-
 monitor = DHP19NetMonitor(in_shape=net.inp.shape,  # (344, 260, 1)
                           out_shape=net.out.shape, # (604,)
+                          target_shape=target.shape, # (2, 2)
                           output_offset=out_offset,
                           num_joints=2)
 
+gt_logger = io.sink.RingBuffer(shape=target.shape, buffer=num_steps)
+output_logger = io.sink.RingBuffer(shape=net.out_layer.shape, buffer=num_steps)
 
-# Create Dataloader
-# The dataloader process reads data from the dataset objects and sends out the input frame and ground truth as spikes.
-# from lava.proc import io
-# data_loader
-# dataloader = io.dataloader.SpikeDataloader(dataset=complete_dataset)
+# connect processes
+dataloader.ground_truth.connect(gt_logger.a_in)
+# gt_logger.a_in.shape
+# dataloader.ground_truth.shape
+
+dataloader.s_out.connect(input_encoder.inp)
+# input_encoder.inp.shape
+# dataloader.s_out.shape # (344, 260, 1)
+
+input_encoder.out.connect(net.inp)
+# net.inp.shape
+# input_encoder.out.shape # (344, 260, 1)
+net.out.connect(output_decoder.inp)
+# output_decoder.inp.shape
+# net.out.shape # (604,)
+
+output_decoder.out.connect(output_logger.a_in)
+# output_logger.a_in.shape
+# output_decoder.out.shape # (604,)
+
+dataloader.s_out.connect(monitor.frame_in)
+# monitor.frame_in.shape # (344, 260, 1)
+# dataloader.s_out.shape # (344, 260, 1)
+
+dataloader.ground_truth.connect(monitor.target_in)
+# dataloader.ground_truth.shape
+# monitor.target_in.shape
+
+output_decoder.out.connect(monitor.output_in)
+# monitor.output_in.shape
+# output_decoder.out.shape
+
+if loihi2_is_available:
+    run_config = CustomHwRunConfig()
+else:
+    run_config = CustomSimRunConfig()
+
+# # Run the network
+from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
+CompilerOptions.verbose = True
+CompilerOptions.log_memory_info = True
+CompilerOptions.show_resource_count = True
+
+# Compile but do not run the network
+exec = net.compile(run_config, None)
+print('WE ARE DONE')
+net.create_runtime(run_cfg=run_config, executable=exec)
+
+net.run(condition=RunSteps(num_steps=2))
+
+net._log_config.level = logging.INFO
+net.run(condition=RunSteps(num_steps=1), run_cfg=run_config)
+net.stop()
+print('hello')
+# net.run(condition=RunSteps(num_steps=1), run_cfg=run_config)
+# output = output_logger.data.get().flatten()
+# net.stop()
+
+if __name__ == '__main__':
+    net.run(condition=RunSteps(num_steps=1), run_cfg=run_config)
+    output = output_logger.data.get().flatten()
+    gts = gt_logger.data.get().flatten()
+    net.stop()

@@ -6,7 +6,7 @@ def plot_input_sample(input_frame, target_coords=None, title=None, path=None):
     Parameters
     ----------
     input_frame : torch.Tensor
-        Input frame.
+        Input frame. (H x W) e.g (260 x 344)
     target_coords : torch.Tensor, optional
         Target coordinates. The default is None.
     title : str, optional

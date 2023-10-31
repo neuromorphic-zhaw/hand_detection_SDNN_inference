@@ -58,6 +58,10 @@ test_set = PilotNetDataset(
     train=False,
 )
 
+data, gt = full_set[0]
+data.shape
+
+
 # Create Dataloader
 dataloader = io.dataloader.SpikeDataloader(dataset=full_set)
 
@@ -88,12 +92,13 @@ dataloader.s_out.connect(monitor.frame_in)
 dataloader.ground_truth.connect(monitor.gt_in)
 output_decoder.out.connect(monitor.output_in)
 
+if loihi2_is_available:
+    run_config = CustomHwRunConfig()
+else:
+    run_config = CustomSimRunConfig()
+
 # Run the network
 if __name__ == '__main__':
-    if loihi2_is_available:
-        run_config = CustomHwRunConfig()
-    else:
-        run_config = CustomSimRunConfig()
     net.run(condition=RunSteps(num_steps=num_steps), run_cfg=run_config)
     output = output_logger.data.get().flatten()
     gts = gt_logger.data.get().flatten()

@@ -1,4 +1,8 @@
+
 from typing import Dict, Tuple
+import numpy as np
+import matplotlib.pyplot as plt
+
 from lava.magma.core.process.process import AbstractProcess
 from lava.magma.core.process.ports.ports import InPort, OutPort
 from lava.magma.core.sync.protocols.loihi_protocol import LoihiProtocol
@@ -11,16 +15,12 @@ from lava.magma.core.model.py.ports import PyInPort, PyOutPort
 from lava.magma.core.model.py.type import LavaPyType
 from lava.magma.core.decorator import implements, requires, tag
 from lava.magma.core.resources import CPU, Loihi2NeuroCore
-# from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
+from lava.proc import io
 
-# from lava.proc import io
-# from lava.proc.io.encoder import Compression
-# from lava.lib.dl.netx.utils import NetDict
-
-# from lava.utils.system import Loihi2
-# if Loihi2.is_loihi2_available:
-#     from lava.proc import embedded_io as eio
-
+from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
+from lava.utils.system import Loihi2
+if Loihi2.is_loihi2_available:
+    from lava.proc import embedded_io as eio
 
 # Input Encoder ###############################################################
 class DHP19NetEncoder(AbstractProcess):
@@ -63,7 +63,7 @@ class DHP19NetPyEncoderModel(AbstractSubProcessModel):
 
 @implements(proc=DHP19NetEncoder, protocol=LoihiProtocol)
 @requires(Loihi2NeuroCore)
-class PilotNetNxEncoderModel(AbstractSubProcessModel):
+class DHP19NetNxEncoderModel(AbstractSubProcessModel):
     """DHP19Net encoder model for Loihi 2."""
     def __init__(self, proc: AbstractProcess) -> None:
         self.inp: PyInPort = LavaPyType(np.ndarray, np.int32)
@@ -142,7 +142,7 @@ class DHP19NetNxDecoderModel(AbstractSubProcessModel):
         self.inp: PyInPort = LavaPyType(np.ndarray, np.int32)
         self.out: PyOutPort = LavaPyType(np.ndarray, np.int32)
         shape = proc.proc_params.get('shape')
-        self.decoder = PilotNetFixedPtDecoder(shape=shape)
+        self.decoder = DHP19NetFixedPtDecoder(shape=shape)
         self.adapter = eio.spike.NxToPyAdapter(shape=shape,
                                                num_message_bits=32)
         proc.inp.connect(self.adapter.inp)
@@ -154,6 +154,7 @@ class DHP19NetMonitor(AbstractProcess):
     def __init__(self,
                  in_shape: Tuple[int, ...],
                  out_shape: Tuple[int, ...],
+                 target_shape: Tuple[int, ...],
                  output_offset=0,
                  num_joints=2) -> None:
         """DHP19Net monitor process.
@@ -164,6 +165,8 @@ class DHP19NetMonitor(AbstractProcess):
             Shape of input.
         out_shape : Tuple[int, ...],
             Shape of output.
+        target_shape : Tuple[int, ...]
+            Shape of target.
         output_offset : int, optional
             Latency of output, by default 0.
         num_joints : int
@@ -172,6 +175,7 @@ class DHP19NetMonitor(AbstractProcess):
         super().__init__(in_shape=in_shape, out_shape=out_shape) #, transform=transform)
         self.frame_in = InPort(shape=in_shape)
         self.output_in = InPort(shape=out_shape)
+        self.target_in = InPort(shape=target_shape)
         self.proc_params['output_offset'] = output_offset
         self.proc_params['num_joints'] = num_joints
 
@@ -179,9 +183,10 @@ class DHP19NetMonitor(AbstractProcess):
 @implements(proc=DHP19NetMonitor, protocol=LoihiProtocol)
 @requires(CPU)
 class DHP19NetMonitorModel(PyLoihiProcessModel):
-    """PilotNet monitor model."""
+    """DHP19Net monitor model."""
     frame_in = LavaPyType(PyInPort.VEC_DENSE, float)
     output_in = LavaPyType(PyInPort.VEC_DENSE, float)
+    target_in = LavaPyType(PyInPort.VEC_DENSE, int)
 
     def __init__(self, proc_params=None) -> None:
         super().__init__(proc_params=proc_params)
@@ -191,5 +196,39 @@ class DHP19NetMonitorModel(PyLoihiProcessModel):
         frame_data = self.frame_in.recv()
         output_data = self.output_in.recv()
         print(output_data)
-        self.fig.imshow(frame_data)
-        display(self.fig)
+        plt.imshow(frame_data[:,:,0], cmap='gray')
+        plt.show()
+
+
+class CustomHwRunConfig(Loihi2HwCfg):
+    """Custom Loihi2 hardware run config."""
+    def __init__(self):
+        super().__init__(select_sub_proc_model=True)
+
+    def select(self, proc, proc_models):
+        # customize run config
+        if isinstance(proc, io.encoder.DeltaEncoder):
+            return io.encoder.PyDeltaEncoderModelSparse
+        if isinstance(proc, DHP19NetEncoder):
+            return DHP19NetNxEncoderModel
+        if isinstance(proc, DHP19NetDecoder):
+            return DHP19NetNxDecoderModel
+        return super().select(proc, proc_models)
+
+
+class CustomSimRunConfig(Loihi2SimCfg):
+    """Custom Loihi2 simulation run config."""
+    def __init__(self):
+        super().__init__(select_tag='fixed_pt')
+
+    def select(self, proc, proc_models):
+        # customize run config
+        if isinstance(proc, io.sink.RingBuffer):
+            return io.sink.PyReceiveModelFloat
+        if isinstance(proc, io.encoder.DeltaEncoder):
+            return io.encoder.PyDeltaEncoderModelDense
+        if isinstance(proc, DHP19NetEncoder):
+            return DHP19NetPyEncoderModel
+        if isinstance(proc, DHP19NetDecoder):
+            return DHP19NetPyDecoderModel
+        return super().select(proc, proc_models)
