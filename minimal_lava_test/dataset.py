@@ -5,6 +5,22 @@ import torch
 import os
 # import matplotlib.pyplot as plt
 
+
+class DummyDataset(Dataset):
+    """
+
+    """
+    def __init__(self, num_samples):
+        self.num_samples = num_samples
+    
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return np.random.rand(344,266, 1, 1), np.random.rand(604)  
+
+
+
 # target_coords_by_cam = target_coords_abs_by_cam 
 def target_coords_to_onehot_smoothed_lowres(target_coords_by_cam, img_height=260, img_width=344, sigma=5, scale=True, downsample_factor=2):
     # target_coords_by_cam.shape
@@ -57,7 +73,6 @@ def target_coords_to_onehot_smoothed_lowres(target_coords_by_cam, img_height=260
     target_coords_by_cam_onehot_flatt = target_coords_by_cam_onehot.view(-1)
     
     return target_coords_by_cam_onehot_flatt
-
 
 
 class DHP19NetDataset(Dataset):
