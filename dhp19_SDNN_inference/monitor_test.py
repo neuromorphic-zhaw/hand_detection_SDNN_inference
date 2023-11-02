@@ -125,11 +125,18 @@ target.shape # ((img_widht + img_height)/downsample_factor) * joints (604)
 # Create Dataloader
 # The dataloader process reads data from the dataset objects and sends out the input frame and ground truth as spikes.
 dataloader = io.dataloader.SpikeDataloader(dataset=complete_dataset)
-# Create Logger for targets
-gt_logger = io.sink.RingBuffer(shape=target.shape, buffer=10)
+
+# Create Monitor for targets
+monitor = DHP19NetMonitor(#in_shape=net.inp.shape,  # (344, 260, 1)
+                          #out_shape=net.out.shape, # (604,)
+                          target_shape=target.shape, # (604, )
+                          #output_offset=out_offset,
+                        #   num_joints=2
+                          )
+
 
 # connect processes
-dataloader.ground_truth.connect(gt_logger.a_in)
+dataloader.ground_truth.connect(monitor.target_in)
 
 from lava.magma.core.run_conditions import RunSteps
 run_condition = RunSteps(num_steps=10)
@@ -140,8 +147,7 @@ else:
     run_config = CustomSimRunConfig()
 
 if __name__ == '__main__':       
-    gt_logger.run(condition=run_condition, run_cfg=run_config)
-    gts = gt_logger.data.get()
-    gt_logger.stop()
-    print('gt_logger run')
-    print(gts)
+    monitor.run(condition=run_condition, run_cfg=run_config)
+    monitor.stop()
+    print('DONE')
+    
