@@ -25,23 +25,25 @@ S1_session1_mov2_sample1.pt  S1_session1_mov3_sample3.pt  S1_session1_mov5_sampl
 ```
 
 ## Problem
-Running lava process consisting of a Dataloader for the DHP19 data,encoder, the network model and monitor.
+Running lava process consisting of a Dataloader for the DHP19 data,encoder, the network model and monitor `dataloader_monitor_encoder.py`.
 
 ```
 ##############
 # Dataloader #
 ##############
       |   |
-      |   -------------------|
+      v   -------------------v
 ##############        ############## 
 # Encoder    #--------# Monitor    #
 ##############        ##############
-      |                      |
+      |                      ^
+      v                      |
 ##############               |
 # Net        #               |
 ##############               |
       |                      |
       ------------------------
+
 ```
 Running only the Dataloder + Encoder + Monitor works and displays the Input frame and its encoded version.
 ![Monitor with input and encoded input](img/input_input_enc.png)
