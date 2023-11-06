@@ -37,7 +37,7 @@ run_condition = RunSteps(num_steps=num_steps)
 ```
 ![Connection between data loader and ringbuffer](<img/loader-buffer.png>)
 
-Resulst in an error down the line... even if all ports got the right size/shape.
+Results in an error down the line... even if all ports got the right size/shape.
 
 Running `dataloader_ringbuffer_test.py` fails with the following error message.
 Output when running on CPU:
