@@ -52,3 +52,18 @@ If one adds the model/net to the process only the first input is shown in the mo
 
 Running it in debug mode list a bunch of subprocesses that appeare to be executed ... but nothing happens.
 ![debug process](img/debug_process.png)
+
+## Requirements
+```bash
+pip list | grep lava
+```
+- lava-dl                   0.4.0
+- lava-dnf                  0.1.4
+- lava-loihi                0.5.0
+- lava-nc                   0.8.0
+- lava-optimization         0.3.0
+```bash
+pip list | grep nx
+```
+- nxcore                    2.4.0
+- on `ncl-edu.research.intel-research.net`
