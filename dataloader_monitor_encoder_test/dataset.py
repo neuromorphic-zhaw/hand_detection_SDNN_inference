@@ -134,7 +134,7 @@ class DHP19NetDataset(Dataset):
                 target_coords_abs_by_cam = data_dict['target_coords_abs'][joint_idxs,:,cam_id,t] # take target joints for time t of cam N
                 # target_coords_abs_by_cam.shape # joints, cam
                 act_targets_1hot = target_coords_to_onehot_smoothed_lowres(target_coords_abs_by_cam)
-                self.target_vectors.append(act_targets_1hot.numpy().astype(np.float32)) # 
+                self.target_vectors.append(act_targets_1hot.numpy().astype(np.float32)[0]) # 
                 # self.session.append(session)
                 # self.subject.append(subject)
                 # self.mov.append(mov)
@@ -143,4 +143,4 @@ class DHP19NetDataset(Dataset):
         return len(self.input_frames)
 
     def __getitem__(self, idx):
-        return self.input_frames[idx], self.target_vectors[idx][0]  # retur ground truth as scalar... as long as io.dataloader.SpikeDataloader dose not support vectors
+        return self.input_frames[idx], self.target_vectors[idx]  # retur ground truth as scalar... as long as io.dataloader.SpikeDataloader dose not support vectors

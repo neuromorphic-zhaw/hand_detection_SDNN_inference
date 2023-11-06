@@ -31,7 +31,8 @@ else:
 
 
 # Set paths to model and data
-project_path = './'
+# project_path = './'
+project_path = '/home/hand_detection_SDNN_inference/dataloader_monitor_encoder_test/'
 model_path = project_path + '../model/train/'
 event_data_path = project_path + '../data/dhp19/'
 # paramters of the traininf data
@@ -55,9 +56,9 @@ complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, 
 print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
 # # show sample from the dataset
-input, target = complete_dataset[0]
-input.shape # (344, 260, 1) W x H x C x T
-target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
+# input, target = complete_dataset[0]
+# input.shape # (344, 260, 1) W x H x C x T
+# target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
 # plot input sample
 # plot_input_sample(np.swapaxes(input[:,:,0,0],0,1), target_coords=None, title='Input frame', path=None)
 
@@ -87,7 +88,9 @@ dataloader = io.dataloader.SpikeDataloader(dataset=complete_dataset)
 gt_logger = io.sink.RingBuffer(shape=(1,), buffer=num_steps)
 
 # Create Monitor
-dhp19_monitor = DHP19NetMonitor(in_shape=input.shape[:-1],
+dhp19_monitor = DHP19NetMonitor(in_shape=net.inp.shape,
+                                in_enc_shape=net.inp.shape,
+                                out_enc_shape=net.out.shape,
                                 output_offset=0,
                                 num_joints=2)
 
@@ -100,10 +103,12 @@ input_encoder = DHP19NetEncoder(shape=net.inp.shape,
 
 # connect processes
 dataloader.ground_truth.connect(gt_logger.a_in)
-dataloader.s_out.connect(dhp19_monitor.frame_in)
 dataloader.s_out.connect(input_encoder.inp)
+dataloader.s_out.connect(dhp19_monitor.frame_in)
 
+input_encoder.out.connect(dhp19_monitor.frame_in_enc)
 input_encoder.out.connect(net.inp)
+net.out.connect(dhp19_monitor.output_in_enc)
 
 run_condition = RunSteps(num_steps=num_steps)
 
@@ -120,6 +125,7 @@ else:
 
 if __name__ == '__main__':       
     net.run(condition=run_condition, run_cfg=run_config)
+    # input_encoder.run(condition=run_condition, run_cfg=run_config)
     gts = gt_logger.data.get()
     net.stop()
     print('DONE')

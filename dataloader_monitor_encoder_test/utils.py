@@ -190,26 +190,17 @@ class DHP19NetNxEncoderModel(AbstractSubProcessModel):
 class DHP19NetMonitor(AbstractProcess):
     def __init__(self,
                 in_shape: Tuple[int, ...],
+                in_enc_shape: Tuple[int, ...],
+                out_enc_shape: Tuple[int, ...],
                 output_offset=0,
                 num_joints=2,
                 ) -> None:
         """DHP19Net monitor process.
-
-        Parameters
-        ----------
-        in_shape : Tuple[int, ...]
-            Shape of input.
-        out_shape : Tuple[int, ...],
-            Shape of output.
-        target_shape : Tuple[int, ...]
-            Shape of target.
-        output_offset : int, optional
-            Latency of output, by default 0.
-        num_joints : int
-            Number of predicted joints, by default 2.
         """
         super().__init__()
         self.frame_in = InPort(shape=in_shape)
+        self.frame_in_enc = InPort(shape=in_enc_shape)
+        self.output_in_enc = InPort(shape=out_enc_shape)
         self.proc_params['output_offset'] = output_offset
         self.proc_params['num_joints'] = num_joints
         
@@ -219,23 +210,32 @@ class DHP19NetMonitor(AbstractProcess):
 class DHP19NetMonitorModel(PyLoihiProcessModel):
     """DHP19Net monitor model."""
     frame_in = LavaPyType(PyInPort.VEC_DENSE, float)
+    frame_in_enc = LavaPyType(PyInPort.VEC_DENSE, np.int32)
+    output_in_enc = LavaPyType(PyInPort.VEC_DENSE, np.int32)
 
     def __init__(self, proc_params=None) -> None:
         super().__init__(proc_params=proc_params)
         self.fig = plt.figure(figsize=(10, 5)) # create figure to plot input frame
-        self.ax1 = self.fig.add_subplot(1, 1, 1)
-        # self.ax2 = self.fig.add_subplot(1, 2, 2)
+        self.ax1 = self.fig.add_subplot(1, 2, 1)
+        self.ax2 = self.fig.add_subplot(1, 2, 2)
         self.output_offset = self.proc_params['output_offset']
         self.num_joints = self.proc_params['num_joints']
     
     def run_spk(self) -> None:
         frame_data = self.frame_in.recv()
-        # print(frame_data)
-        print(frame_data.shape)
+        frame_data_enc = self.frame_in_enc.recv()
+        output_data_enc = self.output_in_enc.recv()
+        print(output_data_enc)
+        print(output_data_enc.shape)
+        # print(frame_data_enc.shape)
+        # print(frame_data.shape)
         self.ax1.clear()
-        # self.ax2.clear()
+        self.ax2.clear()
         self.ax1.set_title('Input Frame ' + str(self.time_step)) 
         self.ax1.imshow(np.swapaxes(frame_data[:,:,0],0,1), cmap='gray')
+        self.ax2.set_title('Input Frame Enc ' + str(self.time_step)) 
+        self.ax2.imshow(np.swapaxes(frame_data_enc[:,:,0],0,1), cmap='gray')
+        
         clear_output(wait=True)
         # plt.show()
         display(self.fig)

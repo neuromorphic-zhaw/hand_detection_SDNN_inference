@@ -47,13 +47,13 @@ num_joints = len(joint_idxs)
 complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
 print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
-# # show sample from the dataset
-input, target = complete_dataset[0]
-input.shape # (344, 260, 1) W x H x C x T
-target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
+# # # show sample from the dataset
+# input, target = complete_dataset[0]
+# input.shape # (344, 260, 1) W x H x C x T
+# target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
 
 # plot input sample
-# plot_input_sample(np.swapaxes(input[:,:,0,0],0,1), target_coords=None, title='Input frame', path=None)
+plot_input_sample(np.swapaxes(input[:,:,0,0],0,1), target_coords=None, title='Input frame', path=None)
 
 # run dataloder + logger for N steps
 num_steps = 100
@@ -73,7 +73,6 @@ dhp19_monitor = DHP19NetMonitor(in_shape=input.shape[:-1],
 # connect processes
 dataloader.ground_truth.connect(gt_logger.a_in)
 dataloader.s_out.connect(dhp19_monitor.frame_in)
-
 run_condition = RunSteps(num_steps=num_steps)
 
 if loihi2_is_available:
