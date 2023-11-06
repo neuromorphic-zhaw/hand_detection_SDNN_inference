@@ -1,6 +1,6 @@
 # run infercence our traine DHP19 model on Loihi?
 from lava.lib.dl import netx
-from dataset import DHP19NetDataset
+# from dataset import DHP19NetDataset
 from lava.proc import io
 from plot import plot_input_sample
 import numpy as np
@@ -9,11 +9,17 @@ from lava.magma.core.run_conditions import RunSteps
 from lava.utils.system import Loihi2
 # from icecream import ic
 
-from utils import (
-    CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
-)
+# from utils import (
+#     CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
+# )
 
 if __name__ == '__main__':      
+    from utils import (
+        CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
+    )
+
+    from dataset import DHP19NetDataset
+
     # Check if Loihi2 compiker is available and import related modules.
     Loihi2.preferred_partition = 'oheogulch'
     loihi2_is_available = Loihi2.is_loihi2_available
@@ -30,8 +36,8 @@ if __name__ == '__main__':
 
 
     # Set paths to model and data
-    # project_path = './'
-    project_path = '/home/hand_detection_SDNN_inference/dataloader_monitor_encoder_test/'
+    project_path = './'
+    # project_path = '/home/hand_detection_SDNN_inference/dataloader_monitor_encoder_test/'
     model_path = project_path + '../model/train/'
     event_data_path = project_path + '../data/dhp19/'
     # paramters of the traininf data

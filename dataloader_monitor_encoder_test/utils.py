@@ -222,9 +222,14 @@ class DHP19NetMonitorModel(PyLoihiProcessModel):
         self.num_joints = self.proc_params['num_joints']
     
     def run_spk(self) -> None:
+        print('run_spk')
         frame_data = self.frame_in.recv()
+        print('got frame data')
         frame_data_enc = self.frame_in_enc.recv()
+        print('got frame encoded data')
         output_data_enc = self.output_in_enc.recv()
+        print('got output data')
+        
         print(output_data_enc)
         print(output_data_enc.shape)
         # print(frame_data_enc.shape)
