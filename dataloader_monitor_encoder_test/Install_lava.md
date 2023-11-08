@@ -1029,7 +1029,7 @@ Required test coverage of 45.0% reached. Total coverage: 47.66%
 ```
 
 ```bash
-lava_env2) ~/lava_git_repos/lava-dl$ pip list | grep lava
+(lava_env2) ~/lava_git_repos/lava-dl$ pip list | grep lava
 lava-dl                       0.4.0.dev0
 lava-nc                       0.8.0.dev0
 ```
