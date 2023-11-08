@@ -8,17 +8,13 @@ import matplotlib.pyplot as plt
 from lava.magma.core.run_conditions import RunSteps
 from lava.utils.system import Loihi2
 # from icecream import ic
-
-# from utils import (
-#     CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
-# )
+from dataset import DHP19NetDataset
+from utils import (
+    CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
+)
 
 if __name__ == '__main__':      
-    from utils import (
-        CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder
-    )
 
-    from dataset import DHP19NetDataset
 
     # Check if Loihi2 compiker is available and import related modules.
     Loihi2.preferred_partition = 'oheogulch'
