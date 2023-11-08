@@ -34,7 +34,7 @@ Running lava process consisting of a Dataloader for the DHP19 data,encoder, the 
       |   |
       v   -------------------v
 ##############        ############## 
-# Encoder    #--------# Monitor    #
+# Encoder    #-------># Monitor    #
 ##############        ##############
       |                      ^
       v                      |

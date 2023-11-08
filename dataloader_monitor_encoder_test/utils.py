@@ -33,8 +33,8 @@ class CustomHwRunConfig(Loihi2HwCfg):
         # customize run config
         if isinstance(proc, io.encoder.DeltaEncoder):
             return io.encoder.PyDeltaEncoderModelSparse
-        # if isinstance(proc, DHP19NetEncoder):
-        #     return DHP19NetNxEncoderModel
+        if isinstance(proc, DHP19NetEncoder):
+             return DHP19NetNxEncoderModel
         # if isinstance(proc, DHP19NetDecoder):
         #     return DHP19NetNxDecoderModel
         return super().select(proc, proc_models)
