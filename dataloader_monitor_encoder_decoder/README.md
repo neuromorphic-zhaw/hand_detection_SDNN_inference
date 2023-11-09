@@ -36,34 +36,31 @@ Running lava process consisting of a Dataloader for the DHP19 data,encoder, the 
 ##############        ############## 
 # Encoder    #-------># Monitor    #
 ##############        ##############
-      |                      ^
+      |                 ^    ^
+      v                 |    |
+##############          |    |
+# Net        #----------|    |
+##############               |
+      |                      |
       v                      |
 ##############               |
-# Net        #               |
+# Decoder    #               |
 ##############               |
       |                      |
       ------------------------
+
+
 
 ```
 Running only the Dataloder + Encoder + Monitor works and displays the Input frame and its encoded version.
 ![Monitor with input and encoded input](img/input_input_enc.png)
 
 If one adds the model/net to the process only the first input is shown in the monitor and nothing further happens. No error message, no output on the console etc.
-
-Running it in debug mode list a bunch of subprocesses that appeare to be executed ... but nothing happens.
-![debug process](img/debug_process.png)
-
 ## Requirements
+`lava`  and `lava-dl` installed from their repos (c.f. `Install_lava_CPUonly.md`)
 ```bash
 pip list | grep lava
+lava-dl                   0.4.0.dev0   /homes/glue/lava_git_repos/lava-dl
+lava-nc                   0.8.0.dev0   /homes/glue/lava_git_repos/lava
 ```
-- lava-dl                   0.4.0
-- lava-dnf                  0.1.4
-- lava-loihi                0.5.0
-- lava-nc                   0.8.0
-- lava-optimization         0.3.0
-```bash
-pip list | grep nx
-```
-- nxcore                    2.4.0
 - on `ncl-edu.research.intel-research.net`

@@ -35,8 +35,8 @@ class CustomHwRunConfig(Loihi2HwCfg):
             return io.encoder.PyDeltaEncoderModelSparse
         if isinstance(proc, DHP19NetEncoder):
              return DHP19NetNxEncoderModel
-        # if isinstance(proc, DHP19NetDecoder):
-        #     return DHP19NetNxDecoderModel
+        if isinstance(proc, DHP19NetDecoder):
+            return DHP19NetNxDecoderModel
         return super().select(proc, proc_models)
 
 
@@ -53,8 +53,8 @@ class CustomSimRunConfig(Loihi2SimCfg):
             return io.encoder.PyDeltaEncoderModelDense
         if isinstance(proc, DHP19NetEncoder):
             return DHP19NetPyEncoderModel
-        # if isinstance(proc, DHP19NetDecoder):
-        #     return DHP19NetPyDecoderModel
+        if isinstance(proc, DHP19NetDecoder):
+            return DHP19NetPyDecoderModel
         return super().select(proc, proc_models)
 
 
@@ -202,8 +202,7 @@ class DHP19NetMonitor(AbstractProcess):
         self.frame_in = InPort(shape=in_shape)
         self.frame_in_enc = InPort(shape=in_enc_shape)
         self.output_in_enc = InPort(shape=out_enc_shape)
-        self.output_in_dec = InPort(shape=out_enc_shape)
-        
+        self.output_in_dec = InPort(shape=out_dec_shape)
         self.proc_params['output_offset'] = output_offset
         self.proc_params['num_joints'] = num_joints
         
@@ -219,33 +218,63 @@ class DHP19NetMonitorModel(PyLoihiProcessModel):
 
     def __init__(self, proc_params=None) -> None:
         super().__init__(proc_params=proc_params)
-        self.fig = plt.figure(figsize=(10, 5)) # create figure to plot input frame
-        self.ax1 = self.fig.add_subplot(1, 2, 1)
-        self.ax2 = self.fig.add_subplot(1, 2, 2)
+        self.fig = plt.figure(figsize=(10, 10)) # create figure
+
+        self.input_frame = plt.subplot2grid((4, 2), (0, 0), rowspan=2, colspan=2)
+        self.y1 = plt.subplot2grid((4, 2), (2, 0))
+        self.x1 = plt.subplot2grid((4, 2), (2, 1))
+        self.y2 = plt.subplot2grid((4, 2), (3, 0))
+        self.x2 = plt.subplot2grid((4, 2), (3, 1))
+        
         self.output_offset = self.proc_params['output_offset']
         self.num_joints = self.proc_params['num_joints']
-    
+        self.img_height = 260
+        self.img_width = 344
+        self.downsample_factor = 2
+        self.xy_coord_vec_length = int((self.img_width + self.img_height)/self.downsample_factor)
+
     def run_spk(self) -> None:
-        print('run_spk')
+        # print('run_spk')
         frame_data = self.frame_in.recv()
-        print('got frame data')
+        # print('got frame data')
         frame_data_enc = self.frame_in_enc.recv()
-        print('got frame encoded data')
+        # print('got frame encoded data')
         output_data_enc = self.output_in_enc.recv()
-        print('got output data enc')
+        # print('got output data enc')
         output_data_dec = self.output_in_dec.recv()
-        print('got output data dec')
-        print(output_data_enc)
-        print(output_data_dec)
-        # print(output_data_enc.shape)
-        # print(frame_data_enc.shape)
-        # print(frame_data.shape)
-        self.ax1.clear()
-        self.ax2.clear()
-        self.ax1.set_title('Input Frame ' + str(self.time_step)) 
-        self.ax1.imshow(np.swapaxes(frame_data[:,:,0],0,1), cmap='gray')
-        self.ax2.set_title('Input Frame Enc ' + str(self.time_step)) 
-        self.ax2.imshow(np.swapaxes(frame_data_enc[:,:,0],0,1), cmap='gray')
+        # print('got output data dec')
+        # print(output_data_enc)
+        # print(output_data_dec)
+
+        # get partes of the output data by coordinate and joint
+        joint = 0    
+        coords_1hot = output_data_dec[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
+        coords_one_hot_y1 = coords_1hot[0:int(self.img_height / self.downsample_factor)]
+        coords_one_hot_x1 = coords_1hot[int(self.img_height / self.downsample_factor):]
+    
+        joint = 1    
+        coords_1hot = output_data_dec[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
+        coords_one_hot_y2 = coords_1hot[0:int(self.img_height / self.downsample_factor)]
+        coords_one_hot_x2 = coords_1hot[int(self.img_height / self.downsample_factor):]
+
+        self.input_frame.clear()
+        self.y1.clear()
+        self.x1.clear()
+        self.y2.clear()
+        self.x2.clear()
+
+        self.input_frame.set_title('Input Frame ' + str(self.time_step)) 
+        self.input_frame.imshow(np.swapaxes(frame_data[:,:,0],0,1), cmap='gray')
+        self.y1.plot(coords_one_hot_y1)
+        # self.y1.set_ylabel('y output')
+        self.y1.set_title('Joint 1')
+        self.x1.plot(coords_one_hot_x1)
+        # self.x1.ylabel('x')
+        self.y2.plot(coords_one_hot_y2)
+        # self.y2.ylabel('y') 
+        # self.y1.title('Joint 1')
+        self.x2.plot(coords_one_hot_x2)
+        # self.x2.ylabel('y')
         
         clear_output(wait=True)
         # plt.show()
