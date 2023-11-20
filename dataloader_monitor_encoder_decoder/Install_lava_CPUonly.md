@@ -44,3 +44,11 @@ python = ">=3.8, <3.11"
 pip install -e .
 pip install jupyter
 ```
+
+## 3. Issues
+`pip` version must be >= 21.3 to suport  usage of `pyproject.toml`` files.
+```bash
+python -m pip install --upgrade pip
+pip --version
+```
+
