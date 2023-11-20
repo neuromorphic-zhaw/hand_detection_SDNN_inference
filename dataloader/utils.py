@@ -190,31 +190,22 @@ class DHP19NetNxDecoderModel(AbstractSubProcessModel):
 class DHP19NetMonitor(AbstractProcess):
     def __init__(self,
                 in_shape: Tuple[int, ...],
-                in_enc_shape: Tuple[int, ...],
-                out_enc_shape: Tuple[int, ...],
-                out_dec_shape: Tuple[int, ...],
-                output_offset=0,
-                num_joints=2,
+                model_out_shape: Tuple[int, ...],
+                num_joints=2
                 ) -> None:
         """DHP19Net monitor process.
         """
         super().__init__()
         self.frame_in = InPort(shape=in_shape)
-        self.frame_in_enc = InPort(shape=in_enc_shape)
-        self.output_in_enc = InPort(shape=out_enc_shape)
-        self.output_in_dec = InPort(shape=out_dec_shape)
-        self.proc_params['output_offset'] = output_offset
+        self.model_output_in = InPort(shape=model_out_shape)
         self.proc_params['num_joints'] = num_joints
-        
 
 @implements(proc=DHP19NetMonitor, protocol=LoihiProtocol)
 @requires(CPU)
 class DHP19NetMonitorModel(PyLoihiProcessModel):
     """DHP19Net monitor model."""
     frame_in = LavaPyType(PyInPort.VEC_DENSE, float)
-    frame_in_enc = LavaPyType(PyInPort.VEC_DENSE, np.int32)
-    output_in_enc = LavaPyType(PyInPort.VEC_DENSE, np.int32)
-    output_in_dec = LavaPyType(PyInPort.VEC_DENSE, float)
+    model_output_in = LavaPyType(PyInPort.VEC_DENSE, float)
 
     def __init__(self, proc_params=None) -> None:
         super().__init__(proc_params=proc_params)
@@ -227,34 +218,27 @@ class DHP19NetMonitorModel(PyLoihiProcessModel):
         self.y2 = plt.subplot2grid((4, 2), (3, 0))
         self.x2 = plt.subplot2grid((4, 2), (3, 1))
         
-        self.output_offset = self.proc_params['output_offset']
         self.num_joints = self.proc_params['num_joints']
         self.img_height = 260
         self.img_width = 344
         self.downsample_factor = 2
         self.xy_coord_vec_length = int((self.img_width + self.img_height)/self.downsample_factor)
-
+    
     def run_spk(self) -> None:
-        # print('run_spk')
         frame_data = self.frame_in.recv()
         print('got frame data')
-        frame_data_enc = self.frame_in_enc.recv()
-        # print('got frame encoded data')
-        output_data_enc = self.output_in_enc.recv()
         # print('got output data enc')
-        output_data_dec = self.output_in_dec.recv()
-        print('got output data dec')
-        # print(output_data_enc)
-        #print(output_data_dec)
-
+        model_output = self.model_output_in.recv()
+        print('got model output')
+        
         # get parts of the output data by coordinate and joint
         joint = 0    
-        coords_1hot = output_data_dec[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
+        coords_1hot = model_output[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
         coords_one_hot_y1 = coords_1hot[0:int(self.img_height / self.downsample_factor)]
         coords_one_hot_x1 = coords_1hot[int(self.img_height / self.downsample_factor):]
     
         joint = 1    
-        coords_1hot = output_data_dec[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
+        coords_1hot = model_output[joint*self.xy_coord_vec_length:(joint+1)*self.xy_coord_vec_length]
         coords_one_hot_y2 = coords_1hot[0:int(self.img_height / self.downsample_factor)]
         coords_one_hot_x2 = coords_1hot[int(self.img_height / self.downsample_factor):]
 
