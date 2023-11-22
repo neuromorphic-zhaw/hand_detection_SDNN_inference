@@ -85,6 +85,7 @@ if __name__ == '__main__':
     dataloader = dataloader.DHP19Dataloader(dataset=complete_dataset)
     # Create Logger for targets
     gt_logger = io.sink.RingBuffer(shape=target.shape, buffer=num_steps)
+    output_logger = io.sink.RingBuffer(shape=net.out.shape, buffer=num_steps)
 
     # Create Monitor
     dhp19_monitor = DHP19NetMonitor(in_shape=net.inp.shape,
@@ -94,6 +95,7 @@ if __name__ == '__main__':
     dataloader.frame_out.connect(dhp19_monitor.frame_in)
     dataloader.frame_out.connect(net.inp)
     net.out.connect(dhp19_monitor.model_output_in)
+    net.out.connect(output_logger.a_in)
 
     run_condition = RunSteps(num_steps=num_steps)
 
