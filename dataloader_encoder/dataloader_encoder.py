@@ -71,11 +71,18 @@ if __name__ == '__main__':
 
     # show sample from the dataset
     input, target = complete_dataset[0]
-    # input.shape # (344, 260) W x H x 1  
-    # target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
+    input.shape # (344, 260) W x H x 1
+    input.max()
+    input.min()
+    target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
     # plot input sample
-    # plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
+    plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
 
+    y_ind = np.where(input[:,:,0] > 0)[0]
+    x_ind = np.where(input[:,:,0] > 0)[1]
+
+    input[y_ind,x_ind,0]
+    
     num_steps = 10
 
     # Create Dataloader
@@ -84,26 +91,14 @@ if __name__ == '__main__':
     # Create Logger for targets
     gt_logger = io.sink.RingBuffer(shape=target.shape, buffer=num_steps)
     output_logger = io.sink.RingBuffer(shape=net.out.shape, buffer=num_steps)
-    encoder_logger = io.sink.RingBuffer(shape=net.inp.shape, buffer=num_steps)
-
-    # Create Input Encoder
-    # For Loihi execution, it additionally compresses and sends the input data to the Loihi 2 chip.
-    input_encoder = DHP19NetEncoder(shape=net.inp.shape,
-                                    net_config=net.net_config,
-                                    compression=compression)
 
     # Create Monitor
     dhp19_monitor = DHP19NetMonitor(in_shape=net.inp.shape,
                                     model_out_shape=net.out.shape)
-
     # connect processes
     dataloader.gt_out.connect(gt_logger.a_in)
     dataloader.frame_out.connect(dhp19_monitor.frame_in)
-    dataloader.frame_out.connect(input_encoder.inp)
-    input_encoder.out.connect(net.inp)
-    input_encoder.out.connect(encoder_logger.a_in)
-    input_encoder.out.connect(dhp19_monitor.frame_encoded_in)
-
+    dataloader.frame_out.connect(net.inp)
     net.out.connect(dhp19_monitor.model_output_in)
     net.out.connect(output_logger.a_in)
 
@@ -118,16 +113,14 @@ if __name__ == '__main__':
     # input_encoder.run(condition=run_condition, run_cfg=run_config)
     gts = gt_logger.data.get()
     outputs = output_logger.data.get()
-    encoded = encoder_logger.data.get()
-    
     net.stop()
-    print('DONE')
-    print(gts)
-    print(outputs)
-    encoded.shape
-
-    gts.shape
+    # print('DONE')
+    # print(gts)
+    # print(outputs)
+    
+    # gts.shape
     plt.plot(gts[:,0], label='Ground Truth')
+    plt.plot(outputs[:,0], label='Output')
     plt.plot(outputs[:,1], label='Output')
     plt.plot(outputs[:,2], label='Output')
     plt.plot(outputs[:,3], label='Output')
@@ -138,3 +131,12 @@ if __name__ == '__main__':
     plt.plot(outputs[:,8], label='Output')
     plt.plot(outputs[:,9], label='Output')
     
+    import torch.nn.functional as F
+    import torch
+    
+    raw_data = outputs[:,6]
+    raw_data = (raw_data.astype(np.int32) << 8) >> 8
+    o_scaled =  raw_data / (1 << 18)
+    plt.plot(o_scaled)
+    o_sig = F.sigmoid(torch.tensor(o_scaled)) 
+    plt.plot(o_sig)
