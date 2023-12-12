@@ -19,6 +19,7 @@ from dataset import DHP19NetDataset
 #     CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder, DHP19NetDecoder
 # )
 
+
 def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
         # get parts of the output data by coordinate and joint
@@ -58,13 +59,17 @@ def show_model_output(model_output, downsample_factor=2, img_height=260, img_wid
     plt.show()
 
 
+
 def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    
     # get parts of the output data by coordinate and joint
     joint = 0    
     coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
     coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
     coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    
+    coords_one_hot_y1.shape
     # get prediction from model output
     predicted_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
     predicted_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
@@ -72,6 +77,8 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     target_1hot = target[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
     target_one_hot_y1 = target_1hot[0:int(img_height / downsample_factor)]
     target_one_hot_x1 = target_1hot[int(img_height / downsample_factor):]
+    
+    target_one_hot_y1.shape
     # get prediction from target
     target_y1 = np.where(target_one_hot_y1 == target_one_hot_y1.max())[0][0]
     target_x1 = np.where(target_one_hot_x1 == target_one_hot_x1.max())[0][0]    
@@ -133,11 +140,80 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     plt.show()
 
 
+
+def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None):
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    
+    # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    
+    coords_one_hot_y1.shape
+    # get prediction from model output
+    predicted_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
+    predicted_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
+    predicted_y1 = predicted_y1 * downsample_factor
+    predicted_x1 = predicted_x1 * downsample_factor
+
+    target_1hot = target[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    target_one_hot_y1 = target_1hot[0:int(img_height / downsample_factor)]
+    target_one_hot_x1 = target_1hot[int(img_height / downsample_factor):]
+    
+    target_one_hot_y1.shape
+    # get prediction from target
+    target_y1 = np.where(target_one_hot_y1 == target_one_hot_y1.max())[0][0]
+    target_x1 = np.where(target_one_hot_x1 == target_one_hot_x1.max())[0][0]    
+    target_y1 = target_y1 * downsample_factor
+    target_x1 = target_x1 * downsample_factor
+
+
+    joint = 1    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    # get prediction from model output
+    predicted_y2 = np.where(coords_one_hot_y2 == coords_one_hot_y2.max())[0][0]
+    predicted_x2 = np.where(coords_one_hot_x2 == coords_one_hot_x2.max())[0][0]
+    predicted_y2 = predicted_y2 * downsample_factor
+    predicted_x2 = predicted_x2 * downsample_factor
+        
+    target_1hot = target[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    target_one_hot_y2 = target_1hot[0:int(img_height / downsample_factor)]
+    target_one_hot_x2 = target_1hot[int(img_height / downsample_factor):]
+    # get prediction from target
+    target_y2 = np.where(target_one_hot_y2 == target_one_hot_y2.max())[0][0]
+    target_x2 = np.where(target_one_hot_x2 == target_one_hot_x2.max())[0][0]
+    target_y2 = target_y2 * downsample_factor
+    target_x2 = target_x2 * downsample_factor
+        
+    fig = plt.figure(figsize=(10,5)) # create figure
+    joint1 = plt.subplot2grid((1, 2), (0, 0))
+    joint2 = plt.subplot2grid((1, 2), (0, 1))
+
+    joint1.imshow(np.swapaxes(input[:,:,0],0,1), cmap='gray')
+    joint1.plot(target_x1, target_y1, 'go', label='target')
+    joint1.plot(predicted_x1, predicted_y1, 'ro', label='predicted')
+
+    joint2.imshow(np.swapaxes(input[:,:,0],0,1), cmap='gray')
+    joint2.plot(target_x2, target_y2, 'go', label='target')
+    joint2.plot(predicted_x2, predicted_y2, 'ro', label='predicted')
+
+    fig.tight_layout()
+    if time_step is not None:
+        fig.suptitle('Model output at time step ' + str(time_step))
+    else:
+        fig.suptitle('Model output')
+
+    plt.show()
+
+
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
     Loihi2.preferred_partition = 'oheogulch'
-    loihi2_is_available = Loihi2.is_loihi2_available
-    # loihi2_is_available = False # Force CPU execution
+    # loihi2_is_available = Loihi2.is_loihi2_available
+    loihi2_is_available = False # Force CPU execution
 
     if loihi2_is_available:
         print(f'Running on {Loihi2.partition}')
@@ -247,7 +323,7 @@ if __name__ == '__main__':
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
     
-    # t = 1
+    # t = 3
     for t in range(num_steps):
         input, target = complete_dataset[t]
         
@@ -257,6 +333,7 @@ if __name__ == '__main__':
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
 
     sender.wait()
