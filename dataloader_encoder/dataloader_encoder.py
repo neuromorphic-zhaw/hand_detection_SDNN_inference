@@ -1,6 +1,7 @@
 # run infercence our traine DHP19 model on Loihi?
 from lava.lib.dl import netx
 import logging
+import torch
 from dataset import DHP19NetDataset
 
 from lava.proc import io
@@ -17,6 +18,120 @@ from dataset import DHP19NetDataset
 # from utils import (
 #     CustomHwRunConfig, CustomSimRunConfig, DHP19NetMonitor, DHP19NetEncoder, DHP19NetDecoder
 # )
+
+def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+        # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+
+    joint = 1    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    
+    fig = plt.figure(figsize=(10, 10)) # create figure
+
+    # self.input_frame = self.fig.add_subplot(111)
+    y1 = plt.subplot2grid((2, 2), (0, 0))
+    x1 = plt.subplot2grid((2, 2), (0, 1))
+    y2 = plt.subplot2grid((2, 2), (1, 0))
+    x2 = plt.subplot2grid((2, 2), (1, 1))
+    y1.plot(coords_one_hot_y1)
+    y1.set_ylabel('y')
+    y1.set_title('Joint 1')
+    x1.plot(coords_one_hot_x1)
+    x1.set_ylabel('x')
+    y2.plot(coords_one_hot_y2)
+    y2.set_ylabel('y') 
+    y2.set_title('Joint 2')
+    x2.plot(coords_one_hot_x2)
+    x2.set_ylabel('y')
+    fig.tight_layout()
+    if time_step is not None:
+        fig.suptitle('Model output at time step ' + str(time_step))
+    else:
+        fig.suptitle('Model output')
+    
+    plt.show()
+
+
+def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None):
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    # get prediction from model output
+    predicted_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
+    predicted_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
+
+    target_1hot = target[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    target_one_hot_y1 = target_1hot[0:int(img_height / downsample_factor)]
+    target_one_hot_x1 = target_1hot[int(img_height / downsample_factor):]
+    # get prediction from target
+    target_y1 = np.where(target_one_hot_y1 == target_one_hot_y1.max())[0][0]
+    target_x1 = np.where(target_one_hot_x1 == target_one_hot_x1.max())[0][0]    
+    
+    joint = 1    
+    coords_1hot = model_output[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    # get prediction from model output
+    predicted_y2 = np.where(coords_one_hot_y2 == coords_one_hot_y2.max())[0][0]
+    predicted_x2 = np.where(coords_one_hot_x2 == coords_one_hot_x2.max())[0][0]
+        
+    target_1hot = target[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    target_one_hot_y2 = target_1hot[0:int(img_height / downsample_factor)]
+    target_one_hot_x2 = target_1hot[int(img_height / downsample_factor):]
+    # get prediction from target
+    target_y2 = np.where(target_one_hot_y2 == target_one_hot_y2.max())[0][0]
+    target_x2 = np.where(target_one_hot_x2 == target_one_hot_x2.max())[0][0]
+    
+    fig = plt.figure(figsize=(10, 10)) # create figure
+
+    # self.input_frame = self.fig.add_subplot(111)
+    y1 = plt.subplot2grid((2, 2), (0, 0))
+    x1 = plt.subplot2grid((2, 2), (0, 1))
+    y2 = plt.subplot2grid((2, 2), (1, 0))
+    x2 = plt.subplot2grid((2, 2), (1, 1))
+
+    y1.plot(coords_one_hot_y1)
+    y1.plot(target_one_hot_y1)
+    y1.vlines(target_y1, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
+    y1.vlines(predicted_y1, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
+    y1.set_ylabel('y')
+    y1.set_title('Joint 1')
+
+    x1.plot(coords_one_hot_x1)
+    x1.plot(target_one_hot_x1)
+    x1.vlines(target_x1, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
+    x1.vlines(predicted_x1, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
+    x1.set_ylabel('x')
+    
+    y2.plot(coords_one_hot_y2)
+    y2.plot(target_one_hot_y2)
+    y2.vlines(target_y2, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
+    y2.vlines(predicted_y2, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
+    y2.set_ylabel('y') 
+    y2.set_title('Joint 2')
+    
+    x2.plot(coords_one_hot_x2)
+    x2.plot(target_one_hot_x2)
+    x2.vlines(target_x2, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
+    x2.vlines(predicted_x2, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
+    x2.set_ylabel('y')
+    fig.tight_layout()
+    if time_step is not None:
+        fig.suptitle('Model output at time step ' + str(time_step))
+    else:
+        fig.suptitle('Model output')
+
+    plt.show()
+
 
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
@@ -57,7 +172,7 @@ if __name__ == '__main__':
     num_joints = len(joint_idxs)
 
     # Load model
-    model_name = 'sdnn_1hot_smoothed_scaled_lowres_rmsprop'
+    model_name = 'sdnn_1hot_smoothed_scaled_lowres_rmsprop_relu_v2'
     # create experiment name
     experiment_name = model_name + \
                     '_epochs' + str(num_epochs) + \
@@ -69,9 +184,18 @@ if __name__ == '__main__':
 
     act_model_path = model_path + experiment_name + '/'
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
-    print(net)
-    len(net)
-    # print('Loading net ' + experiment_name    )
+    
+    # print(net)
+    # len(net)      
+    # net.input_message_bits
+    # net.output_message_bits
+    # net.spike_exp
+    # net.sparse_fc_layer
+    # net.reset_interval
+    # net.in_layer.output_message_bits
+    # net.out_layer.neuron
+
+    # # print('Loading net ' + experiment_name    )
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
     print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
@@ -87,140 +211,54 @@ if __name__ == '__main__':
     # y_ind = np.where(input[:,:,0] > 0)[0]
     # x_ind = np.where(input[:,:,0] > 0)[1]
     # input[y_ind,x_ind,0]
+    
     # Create Dataloader
     # The dataloader process reads data from the dataset objects and sends out the input frame and ground truth as spikes.
     dataloader = dataloader.DHP19Dataloader(dataset=complete_dataset)
     
-    # Input encoding
-    quantize = netx.modules.Quantize(exp=6)  # convert to fixed point representation with 6 bit of fraction
+    # quantize = netx.modules.Quantize(exp=18)  # convert to fixed point representation with 6 bit of fraction
     sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
+    encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
+                                  vth=net.net_config['layer'][0]['neuron']['vThMant'],
+                                  spike_exp=6)
+    
     sender.out_port.shape
-    if loihi2_is_available:
-        # This is needed for the time being until high speed IO is enabled
-        inp_adapter = eio.spike.PyToN3ConvAdapter(shape=sender.out_port.shape,
-                                                num_message_bits=16,
-                                                spike_exp=net.spike_exp,
-                                                compression=compression)
-    # Output decoding 
-    if loihi2_is_available:
-        # This is needed for the time being until high speed IO is enabled
-        state_adapter = eio.state.ReadConv(shape=net.out.shape)
-
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
-    dequantize = netx.modules.Dequantize(exp=net.spike_exp + 12, num_raw_bits=24)
-
+    dequantize = netx.modules.Dequantize(exp=6+12, num_raw_bits=24)
 
     # Data buffers / delays
     # There is a latency in the prediction equal to the number of layers the network has and the encoding step.
     # Two FIFO buffers are used to synchronize the input frame and target annotation with the predicted output.
-    frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
-    annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
+    # frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
+    # annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
     
-    # connect the proceses    
-    if loihi2_is_available:
-        sender.out_port.connect(inp_adapter.inp)
-        inp_adapter.out.connect(net.inp)
-        state_adapter.connect_var(net.out_layer.neuron.sigma)
-        state_adapter.out.connect(receiver.in_port)
-    else:
-        sender.out_port.connect(net.inp)
-        net.out.connect(receiver.in_port)
+    sender.out_port.connect(encoder.a_in)
+    encoder.s_out.connect(net.inp)
+    net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 256
+    num_steps = 50
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
-    if loihi2_is_available:
-        exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
-        run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
-    else:
-        exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
-        run_config = Loihi2SimCfg(select_tag='fixed_pt',
-                              exception_proc_model_map=exception_proc_model_map)
+    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
+    run_config = Loihi2SimCfg(select_tag='fixed_pt',
+                            exception_proc_model_map=exception_proc_model_map)
 
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
     
-    t = 0
+    # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        input.shape
-        frame_quantized = quantize(input)
-        frame_quantized.max()
-        frame_quantized.min()
         
-        sender.send(frame_quantized)        # This sends the input frame to the Lava network
+        sender.send(input)        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
         
-        input_frame = frame_buffer(input)
-        gt = annotation_buffer(target)
+        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
-        print('Input frame: ' + str(t))
-        print(out_dequantized)
 
     sender.wait()
     sender.stop()
-    # Create Logger for targets
-    gt_logger = io.sink.RingBuffer(shape=target.shape, buffer=num_steps)
-    output_logger = io.sink.RingBuffer(shape=net.out.shape, buffer=num_steps)
-    input_logger = io.sink.RingBuffer(shape=net.inp.shape, buffer=num_steps)
-    
-    # Create Monitor
-    dhp19_monitor = DHP19NetMonitor(in_shape=net.inp.shape,
-                                    model_out_shape=net.out.shape)
-    # connect processes
-    dataloader.gt_out.connect(gt_logger.a_in)
-    dataloader.frame_out.connect(dhp19_monitor.frame_in)
-    dataloader.frame_out.connect(quantize.a_in)
-    quantize.out.connect(input_logger.a_in)
-    # net.out.connect(dhp19_monitor.model_output_in)
-    # net.out.connect(output_logger.a_in)
-
-    run_condition = RunSteps(num_steps=num_steps)
-
-    if loihi2_is_available:
-        run_config = CustomHwRunConfig()
-    else:
-        run_config = CustomSimRunConfig()
-
-    input_logger.run(condition=run_condition, run_cfg=run_config)
-    input_logger.stop()
-    print('DONE')
-    gts = gt_logger.data.get()
-    quant_inputs = input_logger.data.get()
-    print(gts)
-    print(quant_inputs)
-    
-    
-    # net.run(condition=run_condition, run_cfg=run_config)
-    # # input_encoder.run(condition=run_condition, run_cfg=run_config)
-    # gts = gt_logger.data.get()
-    # outputs = output_logger.data.get()
-    # net.stop()
-    # print('DONE')
-    # print(gts)
-    # print(outputs)
-    
-    # gts.shape
-    # plt.plot(gts[:,0], label='Ground Truth')
-    # plt.plot(outputs[:,0], label='Output')
-    # plt.plot(outputs[:,1], label='Output')
-    # plt.plot(outputs[:,2], label='Output')
-    # plt.plot(outputs[:,3], label='Output')
-    # plt.plot(outputs[:,4], label='Output')
-    # plt.plot(outputs[:,5], label='Output')
-    # plt.plot(outputs[:,6], label='Output')
-    # plt.plot(outputs[:,7], label='Output')
-    # plt.plot(outputs[:,8], label='Output')
-    # plt.plot(outputs[:,9], label='Output')
-    
-    # import torch.nn.functional as F
-    # import torch
-    
-    # raw_data = outputs[:,6]
-    # raw_data = (raw_data.astype(np.int32) << 8) >> 8
-    # o_scaled =  raw_data / (1 << 18)
-    # plt.plot(o_scaled)
-    # o_sig = F.sigmoid(torch.tensor(o_scaled)) 
-    # plt.plot(o_sig)
+    print('Done')

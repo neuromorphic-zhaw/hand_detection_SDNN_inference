@@ -70,6 +70,8 @@ input_encoder = PilotNetEncoder(shape=net.inp.shape,
                                 net_config=net.net_config,
                                 compression=compression)
 
+input_encoder.p
+
 # Create Output Decoder
 output_decoder = PilotNetDecoder(shape=net.out.shape)
 
