@@ -288,9 +288,9 @@ if __name__ == '__main__':
     
     quantize = netx.modules.Quantize(exp=6)  # convert to fixed point representation with 6 bit of fraction
     sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
-    # encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
-    #                               vth=net.net_config['layer'][0]['neuron']['vThMant'],
-    #                               spike_exp=6)
+    encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
+                                  vth=net.net_config['layer'][0]['neuron']['vThMant'],
+                                  spike_exp=6)
     
     sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
@@ -302,14 +302,13 @@ if __name__ == '__main__':
     # frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
     # annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
     
-    # sender.out_port.connect(encoder.a_in)
-    # encoder.s_out.connect(net.inp)
-    
-    sender.out_port.connect(net.inp)
+    sender.out_port.connect(encoder.a_in)
+    encoder.s_out.connect(net.inp)
+    # sender.out_port.connect(net.inp)
     net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 50
+    num_steps = 25
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
@@ -324,22 +323,20 @@ if __name__ == '__main__':
         input, target = complete_dataset[t]
         input_quantized = quantize(input)
 
-        rand_input = np.random.rand(344, 260, 1)
-
+        # rand_input = np.random.rand(344, 260, 1)
         # input.shape
         # input_quantized.shape
-
         # input.max()
         # input_quantized.max()
         # rand_input.max()
 
-        # sender.send(input)        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
+        sender.send(quantize(input))        # This sends the input frame to the Lava network
+        model_out = receiver.receive()  # This receives the output from the Lava network
+        out_dequantized = dequantize(model_out)
         
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
         # sender.send(input_quantized)        # This sends the input frame to the Lava network
         # model_out = receiver.receive()  # This receives the output from the Lava network
@@ -349,14 +346,13 @@ if __name__ == '__main__':
         # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
-        sender.send(rand_input)        # This sends the input frame to the Lava network
-        model_out = receiver.receive()  # This receives the output from the Lava network
-        out_dequantized = dequantize(model_out)
+        # sender.send(quantize(rand_input))        # This sends the input frame to the Lava network
+        # model_out = receiver.receive()  # This receives the output from the Lava network
+        # out_dequantized = dequantize(model_out)
         
-        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
 
     sender.wait()
     sender.stop()
