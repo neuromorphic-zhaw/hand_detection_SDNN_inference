@@ -2,11 +2,9 @@
 from lava.lib.dl import netx
 import logging
 import torch
+import numpy as np
 from dataset import DHP19NetDataset
-
 from lava.proc import io
-# from lava.proc import embedded_io as eio
-import dataloader 
 from plot import plot_input_sample
 import numpy as np
 import matplotlib.pyplot as plt
@@ -288,15 +286,11 @@ if __name__ == '__main__':
     # x_ind = np.where(input[:,:,0] > 0)[1]
     # input[y_ind,x_ind,0]
     
-    # Create Dataloader
-    # The dataloader process reads data from the dataset objects and sends out the input frame and ground truth as spikes.
-    dataloader = dataloader.DHP19Dataloader(dataset=complete_dataset)
-    
-    # quantize = netx.modules.Quantize(exp=18)  # convert to fixed point representation with 6 bit of fraction
+    quantize = netx.modules.Quantize(exp=6)  # convert to fixed point representation with 6 bit of fraction
     sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
-    encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
-                                  vth=net.net_config['layer'][0]['neuron']['vThMant'],
-                                  spike_exp=6)
+    # encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
+    #                               vth=net.net_config['layer'][0]['neuron']['vThMant'],
+    #                               spike_exp=6)
     
     sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
@@ -308,8 +302,10 @@ if __name__ == '__main__':
     # frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
     # annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
     
-    sender.out_port.connect(encoder.a_in)
-    encoder.s_out.connect(net.inp)
+    # sender.out_port.connect(encoder.a_in)
+    # encoder.s_out.connect(net.inp)
+    
+    sender.out_port.connect(net.inp)
     net.out.connect(receiver.in_port)
 
     # setup run conditions
@@ -323,17 +319,43 @@ if __name__ == '__main__':
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
     
-    # t = 3
+    # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
+        input_quantized = quantize(input)
+
+        rand_input = np.random.rand(344, 260, 1)
+
+        # input.shape
+        # input_quantized.shape
+
+        # input.max()
+        # input_quantized.max()
+        # rand_input.max()
+
+        # sender.send(input)        # This sends the input frame to the Lava network
+        # model_out = receiver.receive()  # This receives the output from the Lava network
+        # out_dequantized = dequantize(model_out)
         
-        sender.send(input)        # This sends the input frame to the Lava network
+        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+
+        # sender.send(input_quantized)        # This sends the input frame to the Lava network
+        # model_out = receiver.receive()  # This receives the output from the Lava network
+        # out_dequantized = dequantize(model_out)
+        
+        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+
+        sender.send(rand_input)        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
+        # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
 
     sender.wait()
