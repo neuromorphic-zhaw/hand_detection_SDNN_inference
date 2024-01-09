@@ -13,9 +13,7 @@ from lava.magma.core.run_conditions import RunSteps
 from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
 from lava.utils.system import Loihi2
 from dataset import DHP19NetDataset
-
-
-eio.state.ReadConv
+import time
 
 def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
@@ -218,8 +216,8 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
     Loihi2.preferred_partition = 'oheogulch'
-    loihi2_is_available = Loihi2.is_loihi2_available
-    # loihi2_is_available = False # Force CPU execution
+    # loihi2_is_available = Loihi2.is_loihi2_available
+    loihi2_is_available = False # Force CPU execution
 
     if loihi2_is_available:
         print(f'Running on {Loihi2.partition}')
@@ -293,17 +291,20 @@ if __name__ == '__main__':
                                   compression=compression)  # net.spike_exp = 6
     
     if loihi2_is_available:
-        # This is needed for the time being until high speed IO is enabled
+        # This is needed for the time being until high speed IO is enabledy
         inp_adapter = eio.spike.PyToN3ConvAdapter(shape=encoder.s_out.shape,
                                                 num_message_bits=16,
                                                 spike_exp=6,
                                                 compression=compression)
         out_adapter = eio.spike.NxToPyAdapter(shape=net.out.shape, num_message_bits=32)
                                                 
-    sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
-    dequantize = netx.modules.Dequantize(exp=6+12, num_raw_bits=24)
+    decoder = netx.modules.Dequantize(exp=6+12, num_raw_bits=24)
 
+    # inp_adapter.spike_exp
+    # encoder.spike_exp
+    # out_adapter.num_message_bits
+    
     # Data buffers / delays
     # There is a latency in the prediction equal to the number of layers the network has and the encoding step.
     # Two FIFO buffers are used to synchronize the input frame and target annotation with the predicted output.
@@ -323,7 +324,7 @@ if __name__ == '__main__':
         net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 25
+    num_steps = 40
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     if loihi2_is_available:
@@ -335,8 +336,13 @@ if __name__ == '__main__':
                               exception_proc_model_map=exception_proc_model_map)
 
     print('Strating sender.run() ... ', end='')
+    start_time = time.time()
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to complete.")
+
     print('Done')   
     # t = 1
 
@@ -354,7 +360,7 @@ if __name__ == '__main__':
 
         sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
-        out_dequantized = dequantize(model_out)
+        out_dequantized = decoder(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target_' + str(t) + '.png')
