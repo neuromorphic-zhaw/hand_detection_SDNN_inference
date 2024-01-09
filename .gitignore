@@ -1,6 +1,6 @@
 # repo specific ignores
 data/
-hand_detection_SDNN_inference/inference_from_injector/plots/
+inference_from_injector/plots/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
