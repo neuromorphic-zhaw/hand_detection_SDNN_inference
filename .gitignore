@@ -1,6 +1,6 @@
 # repo specific ignores
 data/
-inference_from_injector/plots/
+*/plots/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
