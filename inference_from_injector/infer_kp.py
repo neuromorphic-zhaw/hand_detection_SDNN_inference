@@ -224,11 +224,13 @@ if __name__ == '__main__':
         from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
         CompilerOptions.verbose = True
         compression = io.encoder.Compression.DELTA_SPARSE_8
+        system = 'loihi2'
     else:
         print("Loihi2 compiler is not available in this system. "
             "This tutorial will execute on CPU backend.")
         compression = io.encoder.Compression.DENSE
-
+        system = 'cpu'
+    
     # Set paths to model and data
     project_path = './'
     # project_path = '/home/hand_detection_SDNN_inference/dataloader_monitor_encoder_test/'
@@ -335,7 +337,7 @@ if __name__ == '__main__':
         run_config = Loihi2SimCfg(select_tag='fixed_pt',
                               exception_proc_model_map=exception_proc_model_map)
 
-    print('Strating sender.run() ... ', end='')
+    print('Starting sender.run() ... ', end='')
     start_time = time.time()
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
@@ -363,8 +365,10 @@ if __name__ == '__main__':
         out_dequantized = decoder(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target_' + str(t) + '.png')
-        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '.png')
+     
+        
+        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
+        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
 
         # sender.send(input_quantized)        # This sends the input frame to the Lava network
         # model_out = receiver.receive()  # This receives the output from the Lava network
