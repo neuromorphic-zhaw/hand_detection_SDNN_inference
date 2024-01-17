@@ -27,7 +27,16 @@ else:
 
 # Create network block
 net = netx.hdf5.Network(net_config='network.net', skip_layers=1)
-# print(net)
+print(net)
+
+len(net)
+net.input_message_bits
+net.output_message_bits
+net.spike_exp
+net.in_layer.output_message_bits
+net.out_layer.neuron
+
+
 
 # Set execution parameters
 num_samples = 200
@@ -69,8 +78,6 @@ dataloader = io.dataloader.SpikeDataloader(dataset=full_set)
 input_encoder = PilotNetEncoder(shape=net.inp.shape,
                                 net_config=net.net_config,
                                 compression=compression)
-
-input_encoder.p
 
 # Create Output Decoder
 output_decoder = PilotNetDecoder(shape=net.out.shape)

@@ -14,6 +14,7 @@ from lava.utils.system import Loihi2
 from dataset import DHP19NetDataset
 
 
+
 def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
         # get parts of the output data by coordinate and joint
@@ -54,7 +55,7 @@ def show_model_output(model_output, downsample_factor=2, img_height=260, img_wid
 
 
 
-def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None):
+def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
     
     # get parts of the output data by coordinate and joint
@@ -131,11 +132,15 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     else:
         fig.suptitle('Model output')
 
-    plt.show()
+    if filename is not None:
+        plt.savefig(filename)
+        plt.close()
+    else:
+        plt.show()
 
 
 
-def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None):
+def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
     
     # get parts of the output data by coordinate and joint
@@ -200,7 +205,11 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
     else:
         fig.suptitle('Model output')
 
-    plt.show()
+    if filename is not None:
+        plt.savefig(filename)
+        plt.close()
+    else:
+        plt.show()
 
 
 if __name__ == '__main__':      
@@ -210,14 +219,17 @@ if __name__ == '__main__':
     loihi2_is_available = False # Force CPU execution
 
     if loihi2_is_available:
-        print(f'Running on {Loihi2.partition}')
+        print(f'Running on loihi2')
         from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
         CompilerOptions.verbose = True
         compression = io.encoder.Compression.DELTA_SPARSE_8
+        system = 'loihi2'
     else:
         print("Loihi2 compiler is not available in this system. "
             "This tutorial will execute on CPU backend.")
         compression = io.encoder.Compression.DENSE
+        system = 'cpu2_numbits8'
+    
 
     # Set paths to model and data
     project_path = './'
@@ -256,14 +268,14 @@ if __name__ == '__main__':
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
     
     # print(net)
-    # len(net)      
-    # net.input_message_bits
-    # net.output_message_bits
-    # net.spike_exp
-    # net.sparse_fc_layer
-    # net.reset_interval
-    # net.in_layer.output_message_bits
-    # net.out_layer.neuron
+    len(net)
+    net.inp.shape
+    net.out.shape
+    net.input_message_bits
+    net.output_message_bits
+    net.spike_exp
+    net.in_layer.output_message_bits
+    net.out_layer.neuron
 
     # # print('Loading net ' + experiment_name    )
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
@@ -287,11 +299,12 @@ if __name__ == '__main__':
     encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
                                   vth=net.net_config['layer'][0]['neuron']['vThMant'],
                                   spike_exp=6,
+                                  num_bits=8,
                                   compression=compression)
     
     sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
-    dequantize = netx.modules.Dequantize(exp=6+12, num_raw_bits=24)
+    dequantize = netx.modules.Dequantize(exp=net.spike_exp + 12, num_raw_bits=16)
 
     # Data buffers / delays
     # There is a latency in the prediction equal to the number of layers the network has and the encoding step.
@@ -305,7 +318,7 @@ if __name__ == '__main__':
     net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 25
+    num_steps = 40
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
@@ -331,10 +344,11 @@ if __name__ == '__main__':
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
         
-        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
+        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
+        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
+        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
+        
+        print('t = ' + str(t))
         # sender.send(input_quantized)        # This sends the input frame to the Lava network
         # model_out = receiver.receive()  # This receives the output from the Lava network
         # out_dequantized = dequantize(model_out)
