@@ -24,43 +24,15 @@ S1_session1_mov2_sample0.pt  S1_session1_mov3_sample2.pt  S1_session1_mov4_sampl
 S1_session1_mov2_sample1.pt  S1_session1_mov3_sample3.pt  S1_session1_mov5_sample0.pt  S1_session1_mov6_sample4.pt  S1_session1_mov7_sample8.pt
 ```
 
-## Problem
-Running lava process consisting of a Dataloader for the DHP19 data,encoder, the network model and monitor `dataloader_monitor_encoder.py`.
-
-```
-##############
-# Dataloader #
-##############
-      |   |
-      v   -------------------v
-##############        ############## 
-# Encoder    #-------># Monitor    #
-##############        ##############
-      |                 ^    ^
-      v                 |    |
-##############          |    |
-# Net        #----------|    |
-##############               |
-      |                      |
-      v                      |
-##############               |
-# Decoder    #               |
-##############               |
-      |                      |
-      ------------------------
-
-
-
-```
-Running only the Dataloder + Encoder + Monitor works and displays the Input frame and its encoded version.
-![Monitor with input and encoded input](img/input_input_enc.png)
-
-If one adds the model/net to the process only the first input is shown in the monitor and nothing further happens. No error message, no output on the console etc.
-## Requirements
-`lava`  and `lava-dl` installed from their repos (c.f. `Install_lava_CPUonly.md`)
+# Run Lava locally on Loihi
+Set environment variables
 ```bash
-pip list | grep lava
-lava-dl                   0.4.0.dev0   /homes/glue/lava_git_repos/lava-dl
-lava-nc                   0.8.0.dev0   /homes/glue/lava_git_repos/lava
+export NOSLURM=1
+# LOIHI_GEN must be either N3B3 for KPs delivered in 2022
+export LOIHI_GEN=N3B3
+# NXSDKHOST must be the IP address assigned to the host
+export NXSDKHOST=192.168.1.241
+# HOST_BINARY must be the path to the nx_driver_server file on the host
+# Check that this file is accessible using SSH
+export HOST_BINARY=/opt/nxcore/bin/nx_driver_server
 ```
-- on `ncl-edu.research.intel-research.net`

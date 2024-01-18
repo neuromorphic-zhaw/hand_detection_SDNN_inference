@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from lava.magma.core.run_conditions import RunSteps
-from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
+from lava.magma.core.run_configs import Loihi2HwCfg
 from lava.proc import embedded_io as eio
 from lava.proc import io
 
@@ -13,7 +13,6 @@ from lava.lib.dl import netx
 
 # import torch
 from dataset import DHP19NetDataset
-# from plot import plot_input_sample
 from lava.utils.system import Loihi2
 
 
@@ -128,7 +127,7 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     x2.plot(target_one_hot_x2)
     x2.vlines(target_x2, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
     x2.vlines(predicted_x2, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
-    x2.set_ylabel('y')
+    x2.set_ylabel('x')
     fig.tight_layout()
     if time_step is not None:
         fig.suptitle('Model output at time step ' + str(time_step))
@@ -215,26 +214,17 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
         plt.show()
 
 
-def PilotNetDecoder(raw_data):
-        # interpret it as a 24 bit signed integer
-        raw_data = (raw_data.astype(np.int32) << 8) >> 8
-        data = raw_data / (1 << 18)
-        return data
-
-
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
-    Loihi2.preferred_partition = 'oheogulch'
-    loihi2_is_available = Loihi2.is_loihi2_available
-    # loihi2_is_available = False # Force CPU execution
-
+    # Loihi2.preferred_partition = 'oheogulch'
+    # loihi2_is_available = True # force Loihi2
+    
     print(f'Running on loihi2')
     from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
     CompilerOptions.verbose = True
-    # compression = io.encoder.Compression.DELTA_SPARSE_8
+    compression = io.encoder.Compression.DELTA_SPARSE_8
     # compression = io.encoder.Compression.DENSE
-    compression = io.encoder.Compression.SPARSE
-    system = 'loihi2_enc_comp_sparse'
+    system = 'loihi2_delta_sparse_8'
     
 
     # Set paths to model and data
@@ -274,7 +264,7 @@ if __name__ == '__main__':
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
     
     print(net)
-    net.out_layer.neuron.sigma
+    # net.out_layer.neuron.sigma
     # len(net)
     # net.inp.shape
     # net.out.shape
@@ -314,28 +304,24 @@ if __name__ == '__main__':
                                               spike_exp=net.spike_exp,
                                               compression=compression)
     
-    out_adapter = eio.spike.NxToPyAdapter(shape=net.out.shape, num_message_bits=32)
-    state_adapter1 = eio.state.ReadConv(shape=net.out.shape)
-    state_adapter2 = eio.state.Read(shape=net.out.shape)
+    #state_adapter = eio.state.ReadConv(shape=net.out.shape)
+    state_adapter = eio.state.Read(shape=net.out.shape)
 
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
     dequantize = netx.modules.Dequantize(exp=net.spike_exp+12, num_raw_bits=24)
     
-    frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
-    annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
-
+    # connect modules
     sender.out_port.connect(encoder.a_in)
     encoder.s_out.connect(inp_adapter.inp)
     inp_adapter.out.connect(net.inp)
-    net.out.connect(out_adapter.inp)
-    out_adapter.out.connect(receiver.in_port)
+    state_adapter.connect_var(net.out_layer.neuron.sigma)
+    state_adapter.out.connect(receiver.in_port)
     
-
     # setup run conditions
     num_steps = 40
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
-    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
     exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
+    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
     run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
     
     sender._log_config.level = logging.WARN
@@ -344,35 +330,18 @@ if __name__ == '__main__':
     # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        input_quantized = quantize(input)
-
+        # input_quantized = quantize(input)
         sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        out_dequantized = PilotNetDecoder(model_out)
+        out_dequantized = dequantize(model_out)
+        # print(model_out)
+        #out_dequantized = PilotNetDecoder(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
-        
         print('t = ' + str(t))
-        # print(model_out)
-        # sender.send(input_quantized)        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
         
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
-        # sender.send(quantize(rand_input))        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
-    # sender.wait()
+    sender.wait()
     sender.stop()
     print('Done')
