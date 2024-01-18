@@ -216,12 +216,12 @@ if __name__ == '__main__':
     # Check if Loihi2 compiker is available and import related modules.
     # Loihi2.preferred_partition = 'oheogulch'
     # loihi2_is_available = Loihi2.is_loihi2_available
-    loihi2_is_available = False # Force CPU execution
 
+    loihi2_is_available = False # Force CPU execution
     print("Loihi2 compiler is not available in this system. "
         "This tutorial will execute on CPU backend.")
     compression = io.encoder.Compression.DENSE
-    system = 'cpu2'
+    system = 'cpu'
     
 
     # Set paths to model and data
@@ -297,17 +297,11 @@ if __name__ == '__main__':
     
     sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
-    dequantize = netx.modules.Dequantize(exp=net.spike_exp + 12, num_raw_bits=16)
+    dequantize = netx.modules.Dequantize(exp=net.spike_exp + 12, num_raw_bits=24)
 
-    # Data buffers / delays
-    # There is a latency in the prediction equal to the number of layers the network has and the encoding step.
-    # Two FIFO buffers are used to synchronize the input frame and target annotation with the predicted output.
-    # frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
-    # annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
-    
+    # connect modules
     sender.out_port.connect(encoder.a_in)
     encoder.s_out.connect(net.inp)
-    # sender.out_port.connect(net.inp)
     net.out.connect(receiver.in_port)
 
     # setup run conditions
@@ -324,7 +318,7 @@ if __name__ == '__main__':
     # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        input_quantized = quantize(input)
+        # input_quantized = quantize(input)
 
         sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
