@@ -214,11 +214,11 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
         plt.show()
 
 
-def PilotNetDecoder(raw_data):
-        # interpret it as a 24 bit signed integer
-        raw_data = (raw_data.astype(np.int32) << 8) >> 8
-        data = raw_data / (1 << 18)
-        return data
+# def PilotNetDecoder(raw_data):
+#         # interpret it as a 24 bit signed integer
+#         raw_data = (raw_data.astype(np.int32) << 8) >> 8
+#         data = raw_data / (1 << 18)
+#         return data
 
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
@@ -230,7 +230,7 @@ if __name__ == '__main__':
     from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
     CompilerOptions.verbose = True
     compression = io.encoder.Compression.DELTA_SPARSE_8
-    compression = io.encoder.Compression.DENSE
+    # compression = io.encoder.Compression.DENSE
     system = 'loihi2_delta_sparse_8'
     
 
@@ -270,18 +270,7 @@ if __name__ == '__main__':
     act_model_path = model_path + experiment_name + '/'
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
     
-    print(net)
-    # net.out_layer.neuron.sigma
-    # len(net)
-    # net.inp.shape
-    # net.out.shape
-    # net.input_message_bits
-    # net.output_message_bits
-    # net.spike_exp
-    # net.in_layer.output_message_bits
-    # net.out_layer.neuron
-
-    # # print('Loading net ' + experiment_name    )
+    # print('Loading net ' + experiment_name    )
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
     print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
@@ -329,8 +318,8 @@ if __name__ == '__main__':
     # setup run conditions
     num_steps = 40
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
-    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
-    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
+    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
+    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
     run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
     
     sender._log_config.level = logging.WARN
@@ -343,9 +332,9 @@ if __name__ == '__main__':
 
         sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
+        out_dequantized = dequantize(model_out)
         # print(model_out)
-        out_dequantized = PilotNetDecoder(model_out)
+        # out_dequantized = PilotNetDecoder(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
