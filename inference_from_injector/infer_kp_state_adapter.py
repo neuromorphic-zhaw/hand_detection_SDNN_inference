@@ -13,7 +13,6 @@ from lava.lib.dl import netx
 
 # import torch
 from dataset import DHP19NetDataset
-# from plot import plot_input_sample
 from lava.utils.system import Loihi2
 
 
@@ -230,9 +229,9 @@ if __name__ == '__main__':
     print(f'Running on loihi2')
     from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
     CompilerOptions.verbose = True
-    # compression = io.encoder.Compression.DELTA_SPARSE_8
+    compression = io.encoder.Compression.DELTA_SPARSE_8
     compression = io.encoder.Compression.DENSE
-    system = 'loihi2_read_dense'
+    system = 'loihi2_delta_sparse_8'
     
 
     # Set paths to model and data
@@ -316,7 +315,7 @@ if __name__ == '__main__':
     state_adapter = eio.state.Read(shape=net.out.shape)
 
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
-    # dequantize = netx.modules.Dequantize(exp=net.spike_exp+12, num_raw_bits=24)
+    dequantize = netx.modules.Dequantize(exp=net.spike_exp+12, num_raw_bits=24)
     
     frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
     annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
@@ -351,25 +350,8 @@ if __name__ == '__main__':
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
-        
         print('t = ' + str(t))
-        # print(model_out)
-        # sender.send(input_quantized)        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
         
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
-        # sender.send(quantize(rand_input))        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
     sender.wait()
     sender.stop()
     print('Done')

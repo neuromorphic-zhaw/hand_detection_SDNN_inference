@@ -24,38 +24,10 @@ S1_session1_mov2_sample0.pt  S1_session1_mov3_sample2.pt  S1_session1_mov4_sampl
 S1_session1_mov2_sample1.pt  S1_session1_mov3_sample3.pt  S1_session1_mov5_sample0.pt  S1_session1_mov6_sample4.pt  S1_session1_mov7_sample8.pt
 ```
 
-## Problem
-Running lava process consisting of a Dataloader for the DHP19 data,encoder, the network model and monitor `dataloader_monitor_encoder.py`.
-
-```
-##############
-# Dataloader #
-##############
-      |   |
-      v   -------------------v
-##############        ############## 
-# Encoder    #-------># Monitor    #
-##############        ##############
-      |                 ^    ^
-      v                 |    |
-##############          |    |
-# Net        #----------|    |
-##############               |
-      |                      |
-      v                      |
-##############               |
-# Decoder    #               |
-##############               |
-      |                      |
-      ------------------------
+#
 
 
 
-```
-Running only the Dataloder + Encoder + Monitor works and displays the Input frame and its encoded version.
-![Monitor with input and encoded input](img/input_input_enc.png)
-
-If one adds the model/net to the process only the first input is shown in the monitor and nothing further happens. No error message, no output on the console etc.
 ## Requirements
 `lava`  and `lava-dl` installed from their repos (c.f. `Install_lava_CPUonly.md`)
 ```bash

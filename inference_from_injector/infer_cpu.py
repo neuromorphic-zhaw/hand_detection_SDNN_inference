@@ -125,7 +125,7 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     x2.plot(target_one_hot_x2)
     x2.vlines(target_x2, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
     x2.vlines(predicted_x2, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
-    x2.set_ylabel('y')
+    x2.set_ylabel('x')
     fig.tight_layout()
     if time_step is not None:
         fig.suptitle('Model output at time step ' + str(time_step))
@@ -214,21 +214,14 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
 
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
-    Loihi2.preferred_partition = 'oheogulch'
+    # Loihi2.preferred_partition = 'oheogulch'
     # loihi2_is_available = Loihi2.is_loihi2_available
     loihi2_is_available = False # Force CPU execution
 
-    if loihi2_is_available:
-        print(f'Running on loihi2')
-        from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
-        CompilerOptions.verbose = True
-        compression = io.encoder.Compression.DELTA_SPARSE_8
-        system = 'loihi2'
-    else:
-        print("Loihi2 compiler is not available in this system. "
-            "This tutorial will execute on CPU backend.")
-        compression = io.encoder.Compression.DENSE
-        system = 'cpu2_numbits8'
+    print("Loihi2 compiler is not available in this system. "
+        "This tutorial will execute on CPU backend.")
+    compression = io.encoder.Compression.DENSE
+    system = 'cpu2'
     
 
     # Set paths to model and data
@@ -333,13 +326,6 @@ if __name__ == '__main__':
         input, target = complete_dataset[t]
         input_quantized = quantize(input)
 
-        # rand_input = np.random.rand(344, 260, 1)
-        # input.shape
-        # input_quantized.shape
-        # input.max()
-        # input_quantized.max()
-        # rand_input.max()
-
         sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
@@ -349,21 +335,7 @@ if __name__ == '__main__':
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
         
         print('t = ' + str(t))
-        # sender.send(input_quantized)        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
-        # sender.send(quantize(rand_input))        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
 
     sender.wait()
     sender.stop()
