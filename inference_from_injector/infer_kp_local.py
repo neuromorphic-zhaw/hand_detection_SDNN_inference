@@ -1,9 +1,11 @@
 # run infercence our traine DHP19 model on Loihi?
 from lava.lib.dl import netx
+import lava.lib.peripherals.dvs.transformation as tf
 import logging
 import torch
 import numpy as np
 from dataset import DHP19NetDataset
+from prophesee import PropheseeCamera
 from lava.proc import embedded_io as eio
 from lava.proc import io
 from plot import plot_input_sample
@@ -218,6 +220,7 @@ if __name__ == '__main__':
     # Loihi2.preferred_partition = 'oheogulch'
     # loihi2_is_available = Loihi2.is_loihi2_available
     loihi2_is_available = True # Force CPU execution
+    evk_is_available = True
 
     if loihi2_is_available:
         print(f'Running on loihi2')
@@ -285,8 +288,38 @@ if __name__ == '__main__':
     # # plot input sample
     # plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
   
+     # Use EVK3 as input
+    if evk_is_available:
+        # Network input shape
+        input_shape = (img_height, img_width)
+
+        # EVK settings
+        sensor_shape = (720, 1280)
+        biases = None # To be added ...
+
+        # Transformations
+        # - downsample: 1280x720 -> 344x260
+        # - ignore event polarity
+        transformations = tf.Compose([
+            tf.Downsample(factor={"x": input_shape[1] / sensor_shape[1],
+                                "y": input_shape[0] / sensor_shape[0]}),
+            tf.MergePolarities()
+        ])
+
+        # (Only for EventsIterator) mode can be set to "delta_t" or "n_events" which will load
+        # events by timeslice or number of events;
+        # if mode is set to "mixed", events will be loaded by the first met criterion
+        evk_input_proc = PropheseeCamera(sensor_shape=sensor_shape,
+                                        filename="",
+                                        mode="mixed",
+                                        n_events="10000",
+                                        delta_t=5000,
+                                        transformations=transformations,
+                                        biases=biases)
+    else:
+        sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
+
     quantize = netx.modules.Quantize(exp=6)  # convert to fixed point representation with 6 bit of fraction
-    sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
     encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
                                   vth=net.net_config['layer'][0]['neuron']['vThMant'],
                                   spike_exp=0 if loihi2_is_available else 6,
@@ -314,14 +347,17 @@ if __name__ == '__main__':
     # annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
     
     # Connect the processes
-    if loihi2_is_available:
+    if evk_is_available:
+        evk_input_proc.s_out.connect(encoder.a_in)
+    else:
         sender.out_port.connect(encoder.a_in)
+
+    if loihi2_is_available:
         encoder.s_out.connect(inp_adapter.inp)
         inp_adapter.out.connect(net.inp)
         net.out.connect(out_adapter.inp)
         out_adapter.out.connect(receiver.in_port)
     else:
-        sender.out_port.connect(encoder.a_in)
         encoder.s_out.connect(net.inp)
         net.out.connect(receiver.in_port)
 
@@ -339,8 +375,13 @@ if __name__ == '__main__':
 
     print('Starting sender.run() ... ', end='')
     start_time = time.time()
-    sender._log_config.level = logging.WARN
-    sender.run(condition=run_condition, run_cfg=run_config)
+
+    if evk_is_available:
+        evk_input_proc.run(condition=run_condition, run_cfg=run_config)
+    else:
+        sender._log_config.level = logging.WARN
+        sender.run(condition=run_condition, run_cfg=run_config)
+
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"The function took {execution_time} seconds to complete.")
@@ -359,8 +400,8 @@ if __name__ == '__main__':
         # input.max()
         # input_quantized.max()
         # rand_input.max()
-
-        sender.send(quantize(input))        # This sends the input frame to the Lava network
+        if not evk_is_available:
+            sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = decoder(model_out)
         
@@ -386,9 +427,16 @@ if __name__ == '__main__':
         # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
         # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
     print('Done')
-    print('sender.wait() ... ', end='')
-    sender.wait()
-    print('Done')
-    print('sender.stop() ... ', end='')
-    sender.stop()
+    if evk_is_available:
+        print('evk_input_proc.wait() ... ', end='')
+        evk_input_proc.wait()
+        print('Done')
+        print('evk_input_proc.stop() ... ', end='')
+        evk_input_proc.stop()
+    else:
+        print('sender.wait() ... ', end='')
+        sender.wait()
+        print('Done')
+        print('sender.stop() ... ', end='')
+        sender.stop()
     print('Done')
