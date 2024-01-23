@@ -5,7 +5,7 @@ import logging
 import torch
 import numpy as np
 from dataset import DHP19NetDataset
-from prophesee import PropheseeCamera
+from prophesee import PropheseeCamera, PyPropheseeCameraEventsIteratorModel
 from lava.proc import embedded_io as eio
 from lava.proc import io
 from plot import plot_input_sample
@@ -219,8 +219,9 @@ if __name__ == '__main__':
     # Check if Loihi2 compiker is available and import related modules.
     # Loihi2.preferred_partition = 'oheogulch'
     # loihi2_is_available = Loihi2.is_loihi2_available
-    loihi2_is_available = True # Force CPU execution
+    loihi2_is_available = False # Force CPU execution
     evk_is_available = True
+    exception_proc_model_map = {}
 
     if loihi2_is_available:
         print(f'Running on loihi2')
@@ -295,7 +296,15 @@ if __name__ == '__main__':
 
         # EVK settings
         sensor_shape = (720, 1280)
-        biases = None # To be added ...
+        # biases = {
+        #     'bias_diff': 0,
+        #     'bias_diff_off': 25,
+        #     'bias_diff_on': 140,
+        #     'bias_fo': 74,
+        #     'bias_hpf': 0,
+        #     'bias_refr': 68,
+        #     }
+        biases = None # To be tuned ...
 
         # Transformations
         # - downsample: 1280x720 -> 344x260
@@ -312,10 +321,11 @@ if __name__ == '__main__':
         evk_input_proc = PropheseeCamera(sensor_shape=sensor_shape,
                                         filename="",
                                         mode="mixed",
-                                        n_events="10000",
+                                        n_events=10000,
                                         delta_t=5000,
                                         transformations=transformations,
                                         biases=biases)
+        exception_proc_model_map[PropheseeCamera] = PyPropheseeCameraEventsIteratorModel
     else:
         sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
 
@@ -348,7 +358,7 @@ if __name__ == '__main__':
     
     # Connect the processes
     if evk_is_available:
-        evk_input_proc.s_out.connect(encoder.a_in)
+        evk_input_proc.s_out.reshape(new_shape=(img_width, img_height, 1)).connect(encoder.a_in)
     else:
         sender.out_port.connect(encoder.a_in)
 
@@ -366,12 +376,11 @@ if __name__ == '__main__':
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     if loihi2_is_available:
-        exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
+        exception_proc_model_map[io.encoder.DeltaEncoder] = io.encoder.PyDeltaEncoderModelSparse
         run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
     else:
-        exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
-        run_config = Loihi2SimCfg(select_tag='fixed_pt',
-                              exception_proc_model_map=exception_proc_model_map)
+        exception_proc_model_map[io.encoder.DeltaEncoder] = io.encoder.PyDeltaEncoderModelDense
+        run_config = Loihi2SimCfg(exception_proc_model_map=exception_proc_model_map)
 
     print('Starting sender.run() ... ', end='')
     start_time = time.time()

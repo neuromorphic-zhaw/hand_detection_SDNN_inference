@@ -293,9 +293,9 @@ class PyPropheseeCameraEventsIteratorModel(PyLoihiProcessModel):
         Load events from DVS, apply filters and transformations and send
         spikes as frame
         """
-        self.dvs_start_time[self.time_step - 1] = time.time_ns()
+        # self.dvs_start_time[self.time_step - 1] = time.time_ns()
         events = self.reader.get_events()
-        self.before_processing[self.time_step - 1] = time.time_ns()
+        # self.before_processing[self.time_step - 1] = time.time_ns()
 
         # Apply filters to events
         for filter in self.filters:
@@ -324,9 +324,9 @@ class PyPropheseeCameraEventsIteratorModel(PyLoihiProcessModel):
         else:
             frames = np.zeros(self.s_out.shape)
 
-        self.after_processing[self.time_step - 1] = time.time_ns()
+        # self.after_processing[self.time_step - 1] = time.time_ns()
         self.s_out.send(frames)
-        self.end_time[self.time_step - 1] = time.time_ns()
+        # self.end_time[self.time_step - 1] = time.time_ns()
 
     def _pause(self):
         """Pause was called by the runtime"""
@@ -394,7 +394,7 @@ class PyPropheseeCameraRawReaderModel(PyLoihiProcessModel):
     def run_spk(self):
         """Load events from DVS, apply filters and transformations and send
         spikes as frame"""
-        self.dvs_start_time[self.time_step - 1] = time.time_ns()
+        # self.dvs_start_time[self.time_step - 1] = time.time_ns()
         # Time passed since last iteration
         t_now = time.time_ns()
 
@@ -413,7 +413,7 @@ class PyPropheseeCameraRawReaderModel(PyLoihiProcessModel):
             delta_t = np.max([10000, (t_now - self.t_last_iteration) // 1000])
             events = self.reader.load_delta_t(delta_t)
 
-        self.before_processing[self.time_step - 1] = time.time_ns()
+        # self.before_processing[self.time_step - 1] = time.time_ns()
 
         # Apply filters to events
         for filter in self.filters:
@@ -445,13 +445,13 @@ class PyPropheseeCameraRawReaderModel(PyLoihiProcessModel):
         # else:
         #     frames = np.zeros(self.s_out.shape)
 
-        self.after_processing[self.time_step - 1] = time.time_ns()
+        # self.after_processing[self.time_step - 1] = time.time_ns()
         # Send
         # print(len(events), frames.shape)
         # print(np.unique(frames[0, 0], return_counts=True))
         self.s_out.send(frames)
         self.t_last_iteration = t_now
-        self.end_time[self.time_step - 1] = time.time_ns()
+        # self.end_time[self.time_step - 1] = time.time_ns()
 
     def _pause(self):
         """Pause was called by the runtime"""
