@@ -229,9 +229,9 @@ if __name__ == '__main__':
     print(f'Running on loihi2')
     from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
     CompilerOptions.verbose = True
-    compression = io.encoder.Compression.DELTA_SPARSE_8
-    # compression = io.encoder.Compression.DENSE
-    system = 'loihi2_delta_sparse_8'
+    # compression = io.encoder.Compression.DELTA_SPARSE_8
+    compression = io.encoder.Compression.DENSE
+    system = 'loihi2_dense_noquand_input'
     
 
     # Set paths to model and data
@@ -306,9 +306,7 @@ if __name__ == '__main__':
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
     dequantize = netx.modules.Dequantize(exp=net.spike_exp+12, num_raw_bits=24)
     
-    frame_buffer = netx.modules.FIFO(depth=len(net) + 1)
-    annotation_buffer = netx.modules.FIFO(depth=len(net) + 1)
-
+    # connect modules
     sender.out_port.connect(encoder.a_in)
     encoder.s_out.connect(inp_adapter.inp)
     inp_adapter.out.connect(net.inp)
@@ -318,8 +316,8 @@ if __name__ == '__main__':
     # setup run conditions
     num_steps = 40
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
-    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
-    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
+    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
+    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
     run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
     
     sender._log_config.level = logging.WARN
@@ -328,9 +326,11 @@ if __name__ == '__main__':
     # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        input_quantized = quantize(input)
+        # input_quantized = quantize(input)
+        
+        # sender.send(quantize(input))        # This sends the input frame to the Lava network
+        sender.send(input)        # This sends the input frame to the Lava network
 
-        sender.send(quantize(input))        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
         # print(model_out)

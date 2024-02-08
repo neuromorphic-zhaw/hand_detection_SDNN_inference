@@ -8,6 +8,7 @@ from lava.proc import io
 from plot import plot_input_sample
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from lava.magma.core.run_conditions import RunSteps
 from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
 from lava.utils.system import Loihi2
@@ -261,8 +262,8 @@ if __name__ == '__main__':
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
     
     # print(net)
-    len(net)
-    net.inp.shape
+    # len(net)
+    # net.inp.shape
     net.out.shape
     net.input_message_bits
     net.output_message_bits
@@ -274,11 +275,11 @@ if __name__ == '__main__':
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
     print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
+    len(complete_dataset)
     # show sample from the dataset
-    # input, target = complete_dataset[0]
-    # input.shape # (344, 260) W x H x 1
-    # # input.max()
-    # # input.min()
+    input, target = complete_dataset[0]
+    input.shape # (344, 260) W x H x 1
+    input.min(), input.max(), input.dtype
     # # target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
     # # plot input sample
     # plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
@@ -305,7 +306,7 @@ if __name__ == '__main__':
     net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 40
+    num_steps = 100
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
@@ -314,6 +315,13 @@ if __name__ == '__main__':
 
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
+    
+
+    input_list = []
+    output_dequand_list = []
+    output_raw_list = []
+    encoder_output_list = []
+    target_list = []
     
     # t = 1
     for t in range(num_steps):
@@ -327,10 +335,139 @@ if __name__ == '__main__':
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
         plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
-        
+
+        input_list.append(input)
+        output_dequand_list.append(out_dequantized)
+        output_raw_list.append(model_out)
+        target_list.append(target)    
         print('t = ' + str(t))
 
 
     sender.wait()
     sender.stop()
     print('Done')
+
+
+    len(input_list)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    input_img = axs[0].imshow(np.swapaxes(input_list[2][:,:,0],0,1), cmap='gray')
+    cbar1 = fig.colorbar(input_img, shrink=0.6, ax=axs[0])
+    axs[0].set_title('Input')
+
+    encoder_img = axs[1].imshow(np.swapaxes(encoder_output_list[2][:,:,0],0,1), cmap='gray')
+    cbar2 = fig.colorbar(encoder_img, shrink=0.6, ax=axs[1])
+    axs[1].set_title('DeltaEncoding')
+    fig.tight_layout()
+
+    title = axs[0].text(0.5,0.85, "frame 0", bbox={'facecolor':'w', 'alpha':0.5, 'pad':5}, ha="center")
+
+    def update(frame):
+        # for each frame, update the data stored on each artist.
+        input = input_list[frame]
+        encoder_output = encoder_output_list[frame]
+
+        title.set_text('frame ' + str (frame))
+        input_img.set_data(np.swapaxes(input[:,:,0],0,1))
+        encoder_img.set_data(np.swapaxes(encoder_output[:,:,0],0,1))
+        return input_img, encoder_img
+        
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(input_list), interval=200)
+    ani.save(filename="input_vs_encoder_output.mp4", writer="ffmpeg")
+
+def get_prediction_from_1hot_vector(vector_1hot, downsample_factor=2, img_height=260, img_width=344):
+
+    # plot model output  as annimation
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    
+    # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    
+    coords_one_hot_y1.shape
+    # get max 
+    max_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
+    max_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
+    
+    joint = 1    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    # get max
+    max_y2 = np.where(coords_one_hot_y2 == coords_one_hot_y2.max())[0][0]
+    max_x2 = np.where(coords_one_hot_x2 == coords_one_hot_x2.max())[0][0]
+    
+    return max_y1, max_x1, max_y2, max_x2, coords_one_hot_y1, coords_one_hot_x1, coords_one_hot_y2, coords_one_hot_x2
+
+target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = get_prediction_from_1hot_vector(target_list[78], downsample_factor=2, img_height=260, img_width=344)
+
+prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = get_prediction_from_1hot_vector(output_dequand_list[78], downsample_factor=2, img_height=260, img_width=344)
+    
+# np.where(output_one_hot_x1 == output_one_hot_x1.max())[0][0]
+# prediction_x1
+# plt.plot(output_one_hot_x1)
+
+ylim = (-1, 1)
+
+fig, axs = plt.subplots(2, 2)
+y1_plot = axs[0, 0].plot(output_one_hot_y1)
+y1_target = axs[0,0].axvline(target_y1, color='g', ls='--')
+y1_predict = axs[0,0].axvline(prediction_y1, color='r', ls='--')
+# y1.vlines(predicted_y1, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
+axs[0, 0].set_ylabel('y1')
+axs[0, 0].set_title('Joint 1')
+axs[0, 0].set_ylim(ylim)
+
+x1_plot = axs[0, 1].plot(output_one_hot_x1)
+x1_target = axs[0,1].axvline(target_x1, color='g', ls='--')
+x1_predict = axs[0,1].axvline(prediction_x1, color='r', ls='--')
+axs[0, 1].set_ylabel('x1')
+axs[0, 1].set_ylim(ylim)
+
+y2_plot = axs[1, 0].plot(output_one_hot_y2)
+y2_target = axs[1,0].axvline(target_y2, color='g', ls='--')
+y2_predict = axs[1,0].axvline(prediction_y2, color='r', ls='--')
+axs[1, 0].set_ylabel('y2')
+axs[1, 0].set_title('Joint 2')
+axs[1, 0].set_ylim(ylim)
+
+x2_plot = axs[1, 1].plot(output_one_hot_x2)
+x2_target = axs[1,1].axvline(target_x2, color='g', ls='--')
+x2_predict = axs[1,1].axvline(prediction_x2, color='r', ls='--')
+axs[1, 1].set_ylabel('x2')
+axs[1, 1].set_ylim(ylim)
+
+title = axs[0, 0].text(0.5,0.85, "frame 0", bbox={'facecolor':'w', 'alpha':0.5, 'pad':5}, ha="center")
+fig.tight_layout()
+
+def update(frame):
+        # for each frame, update the data stored on each artist.
+    target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = \
+        get_prediction_from_1hot_vector(target_list[frame], downsample_factor=2, img_height=260, img_width=344)
+    prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = \
+        get_prediction_from_1hot_vector(output_dequand_list[frame], downsample_factor=2, img_height=260, img_width=344)
+
+    title.set_text('frame ' + str (frame))
+    y1_plot[0].set_ydata(output_one_hot_y1)
+    y1_target.set_xdata(target_y1)
+    y1_predict.set_xdata(prediction_y1)
+    
+    x1_plot[0].set_ydata(output_one_hot_x1)
+    x1_target.set_xdata(target_x1)
+    x1_predict.set_xdata(prediction_x1)
+    
+    y2_plot[0].set_ydata(output_one_hot_y2)
+    y2_target.set_xdata(target_y2)
+    y2_predict.set_xdata(prediction_y2)
+
+    x2_plot[0].set_ydata(output_one_hot_x2)
+    x2_target.set_xdata(target_x2)
+    x2_predict.set_xdata(prediction_x2)
+    
+    return y1_plot, x1_plot, y2_plot, x2_plot, y1_target, y1_predict
+
+ani = animation.FuncAnimation(fig=fig, func=update, frames=len(output_dequand_list), interval=200)
+ani.save(filename='model_outputs_' + system + '.mp4', writer='ffmpeg')
+    
