@@ -1,21 +1,17 @@
-# run infercence our traine DHP19 model on Loihi?
 from lava.lib.dl import netx
 import logging
-import torch
 import numpy as np
-from dataset import DHP19NetDataset
-from lava.proc import embedded_io as eio
-from lava.proc import io
-from plot import plot_input_sample
-import numpy as np
-import matplotlib.pyplot as plt
-from lava.magma.core.run_conditions import RunSteps
-# from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
-from lava.utils.system import Loihi2
-from dataset import DHP19NetDataset
-import time
 
-from utils import PilotNetEncoder, PilotNetDecoder, CustomHwRunConfig, CustomSimRunConfig
+from lava.proc import io
+from lava.proc import embedded_io as eio
+from lava.magma.core.run_conditions import RunSteps
+from lava.magma.core.run_configs import Loihi2HwCfg
+from lava.utils.system import Loihi2
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from dataset import DHP19NetDataset
+
 
 def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
@@ -54,7 +50,6 @@ def show_model_output(model_output, downsample_factor=2, img_height=260, img_wid
         fig.suptitle('Model output')
     
     plt.show()
-
 
 
 def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
@@ -127,7 +122,7 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
     x2.plot(target_one_hot_x2)
     x2.vlines(target_x2, ymin=0, ymax=1, colors='g', linestyles='dashed', label='target')
     x2.vlines(predicted_x2, ymin=0, ymax=1, colors='r', linestyles='dashed', label='predicted')
-    x2.set_ylabel('y')
+    x2.set_ylabel('x')
     fig.tight_layout()
     if time_step is not None:
         fig.suptitle('Model output at time step ' + str(time_step))
@@ -139,7 +134,6 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
         plt.close()
     else:
         plt.show()
-
 
 
 def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
@@ -214,25 +208,46 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
         plt.show()
 
 
+def get_prediction_from_1hot_vector(vector_1hot, downsample_factor=2, img_height=260, img_width=344):
+
+    # plot model output  as annimation
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    
+    # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    
+    coords_one_hot_y1.shape
+    # get max 
+    max_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
+    max_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
+    
+    joint = 1    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    # get max
+    max_y2 = np.where(coords_one_hot_y2 == coords_one_hot_y2.max())[0][0]
+    max_x2 = np.where(coords_one_hot_x2 == coords_one_hot_x2.max())[0][0]
+    
+    return max_y1, max_x1, max_y2, max_x2, coords_one_hot_y1, coords_one_hot_x1, coords_one_hot_y2, coords_one_hot_x2
+
 
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
     Loihi2.preferred_partition = 'oheogulch'
-    # loihi2_is_available = True # Force KP execution
-    loihi2_is_available = False # Force CPU execution
+    loihi2_is_available = Loihi2.is_loihi2_available
 
-    if loihi2_is_available:
-        print(f'Running on loihi2')
-        from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
-        CompilerOptions.verbose = True
-        compression = io.encoder.Compression.DELTA_SPARSE_8
-        system = 'loihi2'
-    else:
-        print("Loihi2 compiler is not available in this system. "
-            "This tutorial will execute on CPU backend.")
-        compression = io.encoder.Compression.DENSE
-        system = 'cpu'
+    print(f'Running on loihi2')
+    from lava.magma.compiler.subcompilers.nc.ncproc_compiler import CompilerOptions
+    CompilerOptions.verbose = True
+    # compression = io.encoder.Compression.DELTA_SPARSE_8
+    compression = io.encoder.Compression.DENSE
+    system = 'loihi2_dense'
     
+
     # Set paths to model and data
     project_path = './'
     # project_path = '/home/hand_detection_SDNN_inference/dataloader_monitor_encoder_test/'
@@ -267,106 +282,156 @@ if __name__ == '__main__':
                     '_lam' + str(lam)
 
     act_model_path = model_path + experiment_name + '/'
-    print('Loading net ' + experiment_name, end=' ... ')
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
-    print('Done')
-
-    net.spike_exp
-
-    print('Loading dataset', end=' ... ')
+    
+    # print('Loading net ' + experiment_name    )
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
     print('Dataset loaded: ' + str(len(complete_dataset)) + ' samples found')
 
     # show sample from the dataset
+    len(complete_dataset)
+    # # show sample from the dataset
     # input, target = complete_dataset[0]
-    # input.shape # (344, 260) W x H x 1
-    # # input.max()
-    # # input.min()
-    # # target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
+    # input.shape # (344, 260, 1) W x H x 1
+    # input.min(), input.max(), input.dtype
     # # plot input sample
     # plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
+
+    # y_ind = np.where(input[:,:,0] > 0)[0]
+    # x_ind = np.where(input[:,:,0] > 0)[1]
+    # input[y_ind,x_ind,0]
     
+    quantize = netx.modules.Quantize(exp=6)  # convert to fixed point representation with 6 bit of fraction
     sender = io.injector.Injector(shape=net.inp.shape, buffer_size=128)
+    encoder = io.encoder.DeltaEncoder(shape=net.inp.shape,
+                                  vth=net.net_config['layer'][0]['neuron']['vThMant'],
+                                  spike_exp=0,
+                                  num_bits=8,
+                                  compression=compression)
     
-    # Create Input Encoder
-    input_encoder = PilotNetEncoder(shape=net.inp.shape,
-                                net_config=net.net_config,
-                                compression=compression)
+    inp_adapter = eio.spike.PyToN3ConvAdapter(shape=encoder.s_out.shape,
+                                              num_message_bits=16,
+                                              spike_exp=net.spike_exp,
+                                              compression=compression)
+    
+    #state_adapter = eio.state.ReadConv(shape=net.out.shape)
+    state_adapter = eio.state.Read(shape=net.out.shape)
 
-    # Create Output Decoder
-    output_decoder = PilotNetDecoder(shape=net.out.shape)
-    
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
+    dequantize = netx.modules.Dequantize(exp=net.spike_exp+12, num_raw_bits=24)
     
-    # sender.out_port.connect(input_encoder.inp )
-    sender.out_port.connect(net.inp)
-    # input_encoder.out.connect(net.inp)
-    net.out.connect(output_decoder.inp)
-    output_decoder.out.connect(receiver.in_port)
-
+    # connect modules
+    sender.out_port.connect(encoder.a_in)
+    encoder.s_out.connect(inp_adapter.inp)
+    inp_adapter.out.connect(net.inp)
+    state_adapter.connect_var(net.out_layer.neuron.sigma)
+    state_adapter.out.connect(receiver.in_port)
+    
     # setup run conditions
-    num_steps = 40
+    num_steps = 100
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
+    # exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelSparse}
+    exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
+    run_config = Loihi2HwCfg(exception_proc_model_map=exception_proc_model_map)
     
-    if loihi2_is_available:
-        run_config = CustomHwRunConfig()
-    else:
-        run_config = CustomSimRunConfig()
-
-    print('Starting sender.run() ... ', end='')
-    start_time = time.time()
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(f"The function took {execution_time} seconds to complete.")
+    
+    input_list = []
+    output_dequand_list = []
+    output_raw_list = []
+    encoder_output_list = []
+    target_list = []
 
-    print('Done')   
     # t = 1
-
-    print('Starting for loop ... ', end='')
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        # input_quantized = quantize(input)
+        sender.send(quantize(input))        # This sends the input frame to the Lava network
 
-        # rand_input = np.random.rand(344, 260, 1)
-        # input.shape
-        # input_quantized.shape
-        # input.max()
-        # input_quantized.max()
-        # rand_input.max()
-
-        sender.send(input)        # This sends the input frame to the Lava network
         model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = decoder(model_out)
+        out_dequantized = dequantize(model_out)
         
-        print('t = ' + str(t))
-        # print('model_out.shape = ' + str(model_out.shape))
-
-        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-     
-        plot_output_vs_target(model_out, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
+        # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
+        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
-
-        # sender.send(input_quantized)        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-
-        # sender.send(quantize(rand_input))        # This sends the input frame to the Lava network
-        # model_out = receiver.receive()  # This receives the output from the Lava network
-        # out_dequantized = dequantize(model_out)
-        
-        # # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-        # plot_input_vs_prediction_vs_target(rand_input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t)
-    print('Done')
-    print('sender.wait() ... ', end='')
+       
+        input_list.append(input)
+        output_dequand_list.append(out_dequantized)
+        output_raw_list.append(model_out)
+        target_list.append(target)    
+        print('t = ' + str(t))
+    
+    
     sender.wait()
-    print('Done')
-    print('sender.stop() ... ', end='')
     sender.stop()
     print('Done')
+
+    # create annimation of model outputs vs targets
+    # inital data
+    init_sample_idx = 10
+    target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = get_prediction_from_1hot_vector(target_list[init_sample_idx], downsample_factor=2, img_height=260, img_width=344)
+    prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = get_prediction_from_1hot_vector(output_dequand_list[init_sample_idx], downsample_factor=2, img_height=260, img_width=344)
+
+    # initial plot
+    ylim = (-1, 1)
+    fig, axs = plt.subplots(2, 2)
+    y1_plot = axs[0, 0].plot(output_one_hot_y1)
+    y1_target = axs[0,0].axvline(target_y1, color='g', ls='--')
+    y1_predict = axs[0,0].axvline(prediction_y1, color='r', ls='--')
+    axs[0, 0].set_ylabel('y1')
+    axs[0, 0].set_title('Joint 1')
+    axs[0, 0].set_ylim(ylim)
+
+    x1_plot = axs[0, 1].plot(output_one_hot_x1)
+    x1_target = axs[0,1].axvline(target_x1, color='g', ls='--')
+    x1_predict = axs[0,1].axvline(prediction_x1, color='r', ls='--')
+    axs[0, 1].set_ylabel('x1')
+    axs[0, 1].set_ylim(ylim)
+
+    y2_plot = axs[1, 0].plot(output_one_hot_y2)
+    y2_target = axs[1,0].axvline(target_y2, color='g', ls='--')
+    y2_predict = axs[1,0].axvline(prediction_y2, color='r', ls='--')
+    axs[1, 0].set_ylabel('y2')
+    axs[1, 0].set_title('Joint 2')
+    axs[1, 0].set_ylim(ylim)
+
+    x2_plot = axs[1, 1].plot(output_one_hot_x2)
+    x2_target = axs[1,1].axvline(target_x2, color='g', ls='--')
+    x2_predict = axs[1,1].axvline(prediction_x2, color='r', ls='--')
+    axs[1, 1].set_ylabel('x2')
+    axs[1, 1].set_ylim(ylim)
+
+    title = axs[0, 0].text(0.5,0.85, "frame 0", bbox={'facecolor':'w', 'alpha':0.5, 'pad':5}, ha="center")
+    fig.tight_layout()
+
+    # update function for the animation
+    def update(frame):
+            # for each frame, update the data stored on each artist.
+        target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = \
+            get_prediction_from_1hot_vector(target_list[frame], downsample_factor=2, img_height=260, img_width=344)
+        prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = \
+            get_prediction_from_1hot_vector(output_dequand_list[frame], downsample_factor=2, img_height=260, img_width=344)
+
+        title.set_text('frame ' + str (frame))
+        y1_plot[0].set_ydata(output_one_hot_y1)
+        y1_target.set_xdata(target_y1)
+        y1_predict.set_xdata(prediction_y1)
+        
+        x1_plot[0].set_ydata(output_one_hot_x1)
+        x1_target.set_xdata(target_x1)
+        x1_predict.set_xdata(prediction_x1)
+        
+        y2_plot[0].set_ydata(output_one_hot_y2)
+        y2_target.set_xdata(target_y2)
+        y2_predict.set_xdata(prediction_y2)
+
+        x2_plot[0].set_ydata(output_one_hot_x2)
+        x2_target.set_xdata(target_x2)
+        x2_predict.set_xdata(prediction_x2)
+        
+        return y1_plot, x1_plot, y2_plot, x2_plot, y1_target, y1_predict
+
+    # create animation
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(output_dequand_list), interval=200)
+    ani.save(filename='model_outputs_' + system + '.mp4', writer='ffmpeg')
+    
