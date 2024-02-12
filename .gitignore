@@ -1,6 +1,7 @@
 # repo specific ignores
 data/
 */plots/
+*.mp4
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

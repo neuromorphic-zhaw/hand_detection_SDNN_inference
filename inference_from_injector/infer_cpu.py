@@ -1,18 +1,14 @@
-# run infercence our traine DHP19 model on Loihi?
 from lava.lib.dl import netx
 import logging
-import torch
 import numpy as np
-from dataset import DHP19NetDataset
-from lava.proc import io
-from plot import plot_input_sample
-import numpy as np
-import matplotlib.pyplot as plt
-from lava.magma.core.run_conditions import RunSteps
-from lava.magma.core.run_configs import Loihi2HwCfg, Loihi2SimCfg
-from lava.utils.system import Loihi2
-from dataset import DHP19NetDataset
 
+from lava.proc import io
+from lava.magma.core.run_conditions import RunSteps
+from lava.magma.core.run_configs import Loihi2SimCfg
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from dataset import DHP19NetDataset
 
 
 def show_model_output(model_output, downsample_factor=2, img_height=260, img_width=344, time_step=None):
@@ -52,7 +48,6 @@ def show_model_output(model_output, downsample_factor=2, img_height=260, img_wid
         fig.suptitle('Model output')
     
     plt.show()
-
 
 
 def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
@@ -139,7 +134,6 @@ def plot_output_vs_target(model_output, target, downsample_factor=2, img_height=
         plt.show()
 
 
-
 def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_factor=2, img_height=260, img_width=344, time_step=None, filename=None):
     xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
     
@@ -212,6 +206,33 @@ def plot_input_vs_prediction_vs_target(input, model_output, target, downsample_f
         plt.show()
 
 
+def get_prediction_from_1hot_vector(vector_1hot, downsample_factor=2, img_height=260, img_width=344):
+
+    # plot model output  as annimation
+    xy_coord_vec_length = int((img_width + img_height)/downsample_factor)
+    
+    # get parts of the output data by coordinate and joint
+    joint = 0    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y1 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x1 = coords_1hot[int(img_height / downsample_factor):]
+    
+    coords_one_hot_y1.shape
+    # get max 
+    max_y1 = np.where(coords_one_hot_y1 == coords_one_hot_y1.max())[0][0]
+    max_x1 = np.where(coords_one_hot_x1 == coords_one_hot_x1.max())[0][0]
+    
+    joint = 1    
+    coords_1hot = vector_1hot[joint*xy_coord_vec_length:(joint+1)*xy_coord_vec_length]
+    coords_one_hot_y2 = coords_1hot[0:int(img_height / downsample_factor)]
+    coords_one_hot_x2 = coords_1hot[int(img_height / downsample_factor):]
+    # get max
+    max_y2 = np.where(coords_one_hot_y2 == coords_one_hot_y2.max())[0][0]
+    max_x2 = np.where(coords_one_hot_x2 == coords_one_hot_x2.max())[0][0]
+    
+    return max_y1, max_x1, max_y2, max_x2, coords_one_hot_y1, coords_one_hot_x1, coords_one_hot_y2, coords_one_hot_x2
+
+
 if __name__ == '__main__':      
     # Check if Loihi2 compiker is available and import related modules.
     # Loihi2.preferred_partition = 'oheogulch'
@@ -221,7 +242,7 @@ if __name__ == '__main__':
     print("Loihi2 compiler is not available in this system. "
         "This tutorial will execute on CPU backend.")
     compression = io.encoder.Compression.DENSE
-    system = 'cpu'
+    system = 'cpu_dense'
     
 
     # Set paths to model and data
@@ -261,14 +282,14 @@ if __name__ == '__main__':
     net = netx.hdf5.Network(net_config=act_model_path + 'model.net', skip_layers=1)
     
     # print(net)
-    len(net)
-    net.inp.shape
-    net.out.shape
-    net.input_message_bits
-    net.output_message_bits
-    net.spike_exp
-    net.in_layer.output_message_bits
-    net.out_layer.neuron
+    # len(net)
+    # net.inp.shape
+    # net.out.shape
+    # net.input_message_bits
+    # net.output_message_bits
+    # net.spike_exp
+    # net.in_layer.output_message_bits
+    # net.out_layer.neuron
 
     # # print('Loading net ' + experiment_name    )
     complete_dataset = DHP19NetDataset(path=event_data_path, joint_idxs=joint_idxs, cam_id=cam_idxs[0], num_time_steps=seq_length)
@@ -276,9 +297,8 @@ if __name__ == '__main__':
 
     # show sample from the dataset
     # input, target = complete_dataset[0]
-    # input.shape # (344, 260) W x H x 1
-    # # input.max()
-    # # input.min()
+    # input.shape # (344, 260, 1) W x H x 1
+    # input.min(), input.max(), input.dtype
     # # target.shape # ((img_widht + img_height)/downsample_factor) * joints (604, )
     # # plot input sample
     # plot_input_sample(np.swapaxes(input[:,:,0],0,1), target_coords=None, title='Input frame', path=None)
@@ -295,7 +315,6 @@ if __name__ == '__main__':
                                   num_bits=8,
                                   compression=compression)
     
-    sender.out_port.shape
     receiver = io.extractor.Extractor(shape=net.out.shape, buffer_size=128)
     dequantize = netx.modules.Dequantize(exp=net.spike_exp + 12, num_raw_bits=24)
 
@@ -305,7 +324,7 @@ if __name__ == '__main__':
     net.out.connect(receiver.in_port)
 
     # setup run conditions
-    num_steps = 40
+    num_steps = 100
     run_condition = RunSteps(num_steps=num_steps, blocking=False)
     
     exception_proc_model_map = {io.encoder.DeltaEncoder: io.encoder.PyDeltaEncoderModelDense}
@@ -315,22 +334,99 @@ if __name__ == '__main__':
     sender._log_config.level = logging.WARN
     sender.run(condition=run_condition, run_cfg=run_config)
     
+    input_list = []
+    output_dequand_list = []
+    output_raw_list = []
+    encoder_output_list = []
+    target_list = []
+    
     # t = 1
     for t in range(num_steps):
         input, target = complete_dataset[t]
-        # input_quantized = quantize(input)
-
         sender.send(quantize(input))        # This sends the input frame to the Lava network
+        
         model_out = receiver.receive()  # This receives the output from the Lava network
         out_dequantized = dequantize(model_out)
         
         # show_model_output(out_dequantized, downsample_factor=2, img_height=260, img_width=344, time_step=t)   
-        plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
+        # plot_output_vs_target(out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/output_vs_target' + str(t) + '_' + system + '.png')
         # plot_input_vs_prediction_vs_target(input, out_dequantized, target, downsample_factor=2, img_height=260, img_width=344, time_step=t, filename='plots/input_vs_prediction_vs_target_' + str(t) + '_' + system + '.png')
-        
-        print('t = ' + str(t))
 
+        input_list.append(input)
+        output_dequand_list.append(out_dequantized)
+        output_raw_list.append(model_out)
+        target_list.append(target)    
+        print('t = ' + str(t))
 
     sender.wait()
     sender.stop()
     print('Done')
+
+    # create annimation of model outputs vs targets
+    # inital data
+    target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = get_prediction_from_1hot_vector(target_list[78], downsample_factor=2, img_height=260, img_width=344)
+    prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = get_prediction_from_1hot_vector(output_dequand_list[78], downsample_factor=2, img_height=260, img_width=344)
+
+    # initial plot
+    ylim = (-1, 1)
+    fig, axs = plt.subplots(2, 2)
+    y1_plot = axs[0, 0].plot(output_one_hot_y1)
+    y1_target = axs[0,0].axvline(target_y1, color='g', ls='--')
+    y1_predict = axs[0,0].axvline(prediction_y1, color='r', ls='--')
+    axs[0, 0].set_ylabel('y1')
+    axs[0, 0].set_title('Joint 1')
+    axs[0, 0].set_ylim(ylim)
+
+    x1_plot = axs[0, 1].plot(output_one_hot_x1)
+    x1_target = axs[0,1].axvline(target_x1, color='g', ls='--')
+    x1_predict = axs[0,1].axvline(prediction_x1, color='r', ls='--')
+    axs[0, 1].set_ylabel('x1')
+    axs[0, 1].set_ylim(ylim)
+
+    y2_plot = axs[1, 0].plot(output_one_hot_y2)
+    y2_target = axs[1,0].axvline(target_y2, color='g', ls='--')
+    y2_predict = axs[1,0].axvline(prediction_y2, color='r', ls='--')
+    axs[1, 0].set_ylabel('y2')
+    axs[1, 0].set_title('Joint 2')
+    axs[1, 0].set_ylim(ylim)
+
+    x2_plot = axs[1, 1].plot(output_one_hot_x2)
+    x2_target = axs[1,1].axvline(target_x2, color='g', ls='--')
+    x2_predict = axs[1,1].axvline(prediction_x2, color='r', ls='--')
+    axs[1, 1].set_ylabel('x2')
+    axs[1, 1].set_ylim(ylim)
+
+    title = axs[0, 0].text(0.5,0.85, "frame 0", bbox={'facecolor':'w', 'alpha':0.5, 'pad':5}, ha="center")
+    fig.tight_layout()
+
+    # update function for the animation
+    def update(frame):
+            # for each frame, update the data stored on each artist.
+        target_y1, target_x1, target_y2, target_x2, target_one_hot_y1, target_one_hot_x1, target_one_hot_y2, target_one_hot_x2 = \
+            get_prediction_from_1hot_vector(target_list[frame], downsample_factor=2, img_height=260, img_width=344)
+        prediction_y1, prediction_x1, prediction_y2, prediction_x2, output_one_hot_y1, output_one_hot_x1, output_one_hot_y2, output_one_hot_x2 = \
+            get_prediction_from_1hot_vector(output_dequand_list[frame], downsample_factor=2, img_height=260, img_width=344)
+
+        title.set_text('frame ' + str (frame))
+        y1_plot[0].set_ydata(output_one_hot_y1)
+        y1_target.set_xdata(target_y1)
+        y1_predict.set_xdata(prediction_y1)
+        
+        x1_plot[0].set_ydata(output_one_hot_x1)
+        x1_target.set_xdata(target_x1)
+        x1_predict.set_xdata(prediction_x1)
+        
+        y2_plot[0].set_ydata(output_one_hot_y2)
+        y2_target.set_xdata(target_y2)
+        y2_predict.set_xdata(prediction_y2)
+
+        x2_plot[0].set_ydata(output_one_hot_x2)
+        x2_target.set_xdata(target_x2)
+        x2_predict.set_xdata(prediction_x2)
+        
+        return y1_plot, x1_plot, y2_plot, x2_plot, y1_target, y1_predict
+
+    # create animation
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(output_dequand_list), interval=200)
+    ani.save(filename='model_outputs_' + system + '.mp4', writer='ffmpeg')
+        
