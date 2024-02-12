@@ -245,7 +245,7 @@ if __name__ == '__main__':
     CompilerOptions.verbose = True
     # compression = io.encoder.Compression.DELTA_SPARSE_8
     compression = io.encoder.Compression.DENSE
-    system = 'loihi2_local_dense'
+    system = 'loihi2_dense'
     
 
     # Set paths to model and data
@@ -434,4 +434,4 @@ if __name__ == '__main__':
     # create animation
     ani = animation.FuncAnimation(fig=fig, func=update, frames=len(output_dequand_list), interval=200)
     ani.save(filename='model_outputs_' + system + '.mp4', writer='ffmpeg')
-    print('Done')
+    
