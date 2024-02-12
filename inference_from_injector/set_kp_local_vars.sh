@@ -1,3 +1,5 @@
+#!/bin/bash
+unset SLURM
 export NOSLURM=1
 # LOIHI_GEN must be either N3B3 for KPs delivered in 2022
 export LOIHI_GEN=N3B3
